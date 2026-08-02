@@ -23,7 +23,7 @@
   --nav:268px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
+html,body{height:100%;overflow-x:hidden}
 body{background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;letter-spacing:-.005em;
   font-family:Inter,Manrope,"Segoe UI Variable","Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
@@ -2105,7 +2105,7 @@ function seletorMatriz(t, forcar) {
 function modalRede() {
   modal("Nova rede",
     nota("Uma rede é um grupo empresarial. Você cadastra a <b>holding</b> aqui; as empresas do grupo entram depois, cada uma com licença e manutenção próprias.", "inf") +
-    '<div class="rw rw2"><div class="fld"><label>Nome da rede / holding <span class="rq">*</span></label><input id="rd-nome" placeholder="ex.: Grupo Lucena"></div>' +
+    '<div class="rw rw2"><div class="fld"><label>Nome da rede / holding <span class="rq">*</span></label><input id="rd-nome" placeholder="ex.: nome do grupo"></div>' +
     '<div class="fld"><label>Razão social</label><input id="rd-razao"></div></div>' +
     '<div class="rw rw3"><div class="fld"><label>CNPJ</label><input id="rd-cnpj"></div>' +
     '<div class="fld"><label>Cidade</label><input id="rd-cid"></div>' +

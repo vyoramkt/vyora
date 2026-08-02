@@ -1889,7 +1889,11 @@ function vazio(titulo, texto, acao, icone) {
     (texto ? "<p>" + esc(texto) + "</p>" : "") + (acao || "") + "</div>";
 }
 function tabela(cols, rows, vaz, onRow) {
-  if (!rows.length) return typeof vaz === "string" ? vazio(vaz, "", "", "file") : vaz;
+  if (!rows.length) {
+    /* o estado vazio pode vir pronto (HTML) ou como um simples título */
+    if (typeof vaz !== "string") return vaz;
+    return vaz.charAt(0) === "<" ? vaz : vazio(vaz, "", "", "file");
+  }
   return '<div class="tw"><table><thead><tr>' + cols.map(function (c) { return "<th class='" + (c.cls || "") + "'>" + esc(c.h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
     rows.map(function (r) {
       return "<tr" + (onRow ? ' class="clik" onclick="' + onRow(r) + '"' : "") + ">" + cols.map(function (c) { return "<td class='" + (c.cls || "") + "'>" + c.r(r) + "</td>"; }).join("") + "</tr>";

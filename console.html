@@ -551,7 +551,11 @@ function vazio(titulo, texto, acao, icone) {
     (texto ? "<p>" + esc(texto) + "</p>" : "") + (acao || "") + "</div>";
 }
 function tabela(cols, rows, vaz, onRow) {
-  if (!rows.length) return typeof vaz === "string" ? vazio(vaz, "", "", "file") : vaz;
+  if (!rows.length) {
+    /* o estado vazio pode vir pronto (HTML) ou como um simples título */
+    if (typeof vaz !== "string") return vaz;
+    return vaz.charAt(0) === "<" ? vaz : vazio(vaz, "", "", "file");
+  }
   return '<div class="tw"><table><thead><tr>' + cols.map(function (c) { return "<th class='" + (c.cls || "") + "'>" + esc(c.h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
     rows.map(function (r) {
       return "<tr" + (onRow ? ' class="clik" onclick="' + onRow(r) + '"' : "") + ">" + cols.map(function (c) { return "<td class='" + (c.cls || "") + "'>" + c.r(r) + "</td>"; }).join("") + "</tr>";
@@ -1676,7 +1680,7 @@ function pg_empresas(p) {
     '<button class="btn btn-p" onclick="modalEmpresa()">' + ICON.plus + "Nova empresa</button>");
   if (!empresas().length) {
     return h + '<div class="box">' + vazio("Nenhum cliente cadastrado",
-      "Cadastre a partir do contrato assinado. Uma <b>rede</b> é um grupo empresarial com holding e empresas vinculadas; uma <b>empresa</b> é um cliente independente. O ambiente só é criado depois que o pagamento inicial for confirmado.",
+      "Cadastre a partir do contrato assinado. Uma rede é um grupo empresarial com holding e empresas vinculadas; uma empresa é um cliente independente. O ambiente só é criado depois que o pagamento inicial for confirmado.",
       '<button class="btn btn-lg" onclick="modalRede()">' + ICON.plus + "Cadastrar rede</button>" +
       '<button class="btn btn-p btn-lg" onclick="modalEmpresa()">' + ICON.plus + "Cadastrar empresa</button>", "empresa") + "</div>";
   }

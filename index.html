@@ -23,7 +23,7 @@
   --nav:268px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
+html,body{height:100%;overflow-x:hidden}
 body{background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;letter-spacing:-.005em;
   font-family:Inter,Manrope,"Segoe UI Variable","Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
@@ -358,7 +358,7 @@ tr.clik:hover td{background:#fafbfc}
 .pdv-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line-2);font-size:13px}
 .pdv-item b{font-size:13.5px}
 .pdv-qtd{display:flex;align-items:center;gap:8px}
-.pdv-qtd button{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:16px;line-height:1;color:var(--brand);font-weight:700}
+.pdv-qtd button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:16px;line-height:1;color:var(--brand);font-weight:700}
 .pdv-qtd button:hover{background:var(--brand-soft)}
 .pdv-qtd span{min-width:18px;text-align:center;font-weight:650}
 .pdv-total{display:flex;justify-content:space-between;align-items:center;padding:14px 0;margin-bottom:8px;border-top:1.5px solid var(--ink)}
@@ -429,6 +429,70 @@ tr.clik:hover td{background:#fafbfc}
 @media print{.nav,.bar,.head .act,.filters,.sup-fab{display:none!important}.shell{margin:0}.page{padding:0}}
 .imp{position:fixed;left:0;right:0;bottom:0;z-index:80;background:var(--alert);color:#3a2a00;display:flex;gap:14px;
   align-items:center;justify-content:center;padding:11px 16px;font-size:12.5px;font-weight:600;box-shadow:0 -6px 20px rgba(0,0,0,.14)}
+
+/* ---------- histórico mensal ---------- */
+.hbars{display:flex;align-items:flex-end;gap:clamp(6px,1.4vw,16px);height:190px}
+.hb{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0}
+.hb-t{font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hb-c{flex:1;width:100%;display:flex;align-items:flex-end;background:var(--line-2);border-radius:8px;overflow:hidden}
+.hb-c span{width:100%;background:linear-gradient(to top,var(--brand),var(--brand-2));border-radius:8px 8px 0 0;
+  transition:height .8s cubic-bezier(.22,.61,.36,1)}
+.hb:last-child .hb-c span{background:linear-gradient(to top,var(--grow-deep),var(--grow))}
+.hb-l{font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.hm{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);
+  padding:18px 20px;margin-bottom:12px}
+.hm-h{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.hm-h b{font-size:15px;font-weight:660}
+.hm-g{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.hm-g{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.hm-g{grid-template-columns:1fr}.hbars{height:150px}}
+.hm-g>div{display:flex;flex-direction:column;gap:2px}
+.hm-g span{font-size:11.5px;color:var(--ink-3)}
+.hm-g b{font-size:16px;font-weight:650;letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+.hm-m{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}
+.hm-m span{font-size:11.5px;color:var(--ink-3);border:1px solid var(--line);border-radius:999px;padding:4px 11px}
+.hm-m span.ok{color:var(--grow-deep);border-color:var(--grow)}
+
+/* ---------- supervisão de PDV ---------- */
+.pdv-sup{display:flex;align-items:center;gap:13px;padding:13px 0}
+.pdv-sup .av{width:38px;height:38px;border-radius:12px;font-size:13px;flex:none}
+.ponto{width:9px;height:9px;border-radius:50%;flex:none;background:var(--line)}
+.ponto.on{background:var(--grow);box-shadow:0 0 0 4px var(--grow-soft);animation:pulsa 2.4s ease-in-out infinite}
+@keyframes pulsa{0%,100%{opacity:.55}50%{opacity:1}}
+.pdv-on-n{font-variant-numeric:tabular-nums}
+@media(max-width:560px){.pdv-sup{flex-wrap:wrap}.pdv-sup .sm{text-align:left!important}}
+
+/* ---------- tour guiado ---------- */
+.head-t{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.bt-tour{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;
+  color:var(--ink-3);border-radius:999px;padding:5px 12px 5px 9px;font-size:11.5px;font-weight:600;
+  cursor:pointer;transition:.15s;white-space:nowrap}
+.bt-tour svg{width:15px;height:15px}
+.bt-tour:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+.bt-tour.novo{border-color:var(--grow);color:var(--grow)}
+.bt-tour.novo::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--grow);
+  animation:tourPulse 2s ease-in-out infinite}
+@keyframes tourPulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+body.tour-on{overflow:hidden}
+#tour{position:fixed;inset:0;z-index:120}
+#tour.hidden{display:none}
+.tour-foco{position:fixed;z-index:1;border-radius:12px;box-shadow:0 0 0 9999px rgba(6,25,35,.62),0 0 0 2px var(--grow);
+  transition:top .22s,left .22s,width .22s,height .22s;pointer-events:none}
+.tour-foco.vazio{inset:0;border-radius:0;box-shadow:inset 0 0 0 9999px rgba(6,25,35,.62)}
+.tour-cd{position:fixed;z-index:2;top:50%;left:50%;background:#fff;color:var(--ink);max-height:calc(100vh - 24px);overflow:auto;border-radius:16px;padding:17px 18px 15px;box-shadow:0 26px 60px -22px rgba(9,40,56,.55);
+  transition:top .22s,left .22s;animation:tourIn .28s ease}
+@keyframes tourIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.tour-h{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.tour-n{font-size:10.5px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--grow)}
+.tour-x{margin-left:auto;border:none;background:none;font-size:19px;line-height:1;color:var(--ink-3);cursor:pointer;padding:0 2px}
+.tour-x:hover{color:var(--ink)}
+.tour-cd b{display:block;font-size:15.5px;font-weight:660;letter-spacing:-.3px;margin-bottom:6px}
+.tour-cd p{font-size:13px;line-height:1.6;color:var(--ink-2)}
+.tour-pg{display:flex;gap:5px;margin:14px 0 12px}
+.tour-pg span{width:16px;height:3px;border-radius:2px;background:var(--line)}
+.tour-pg span.on{background:var(--grow)}
+.tour-f{display:flex;gap:8px;justify-content:flex-end}
+@media(max-width:640px){.tour-cd{left:12px!important;right:12px;width:auto!important}}
 </style>
 </head>
 <body>
@@ -582,6 +646,8 @@ var ICON = {
   box: svg('<path d="M12 3.4 19.8 7.5v9L12 20.6 4.2 16.5v-9Z"/><path d="M4.2 7.5 12 11.6l7.8-4.1M12 11.6v9"/>'),
   user: svg('<circle cx="12" cy="8.2" r="3.6"/><path d="M5 20c.6-3.5 3.4-5.5 7-5.5s6.4 2 7 5.5"/>'),
   users: svg('<circle cx="9" cy="8.4" r="3.2"/><path d="M3 19.4c.5-3 2.7-4.7 6-4.7s5.5 1.7 6 4.7"/><path d="M15.8 6.6a2.9 2.9 0 0 1 0 5.5M21 19.4c-.3-2-1.2-3.4-2.6-4.2"/>'),
+  supervisao: svg('<rect x="3" y="4.4" width="18" height="12.4" rx="2.4"/><path d="M8.2 20.4h7.6M12 16.8v3.6"/><path d="M7.4 13.4l2.7-3.1 2.3 2 2.9-3.7"/>'),
+  tour: svg('<path d="M12 4.2 21 8.4l-9 4.2-9-4.2Z"/><path d="M6.6 10.9v4.6c0 1.6 2.4 2.9 5.4 2.9s5.4-1.3 5.4-2.9v-4.6"/><path d="M21 8.4v5.2"/>'),
   suporte: svg('<path d="M4.4 12a7.6 7.6 0 0 1 15.2 0"/><rect x="2.6" y="12" width="4.2" height="6.4" rx="2.1"/><rect x="17.2" y="12" width="4.2" height="6.4" rx="2.1"/><path d="M19.3 18.4v.6a2.6 2.6 0 0 1-2.6 2.6H13"/>'),
   fatura: svg('<path d="M5.4 3.4h13.2v17.2l-2.6-1.6-2.6 1.6-2.6-1.6-2.6 1.6-2.8-1.6z"/><path d="M8.8 8.4h6.4M8.8 12.2h6.4M8.8 16h3.6"/>'),
   licenca: svg('<rect x="3.2" y="5" width="17.6" height="14" rx="2.6"/><path d="M3.2 9.6h17.6M7 14.2h4.4M15.4 14.2h1.8"/>'),
@@ -674,6 +740,7 @@ var PERFIS = {
 var MENU = [
   { k: "pdv", n: "Vender", perfis: ["vendedor"] },
   { k: "dashboard", n: "Dashboard", perfis: ["admin"] },
+  { k: "supervisao", n: "Supervisão de PDV", perfis: ["admin"] },
   { k: "vendas", n: "Vendas", perfis: ["admin", "vendedor"] },
   { k: "clientes", n: "Clientes", perfis: ["admin", "vendedor"] },
   { k: "produtos", n: "Produtos", perfis: ["admin", "vendedor"] },
@@ -1713,6 +1780,8 @@ function iniciarApp() {
   el("app").style.display = "block";
   aplicarMarca(); montarMenu(); montarUsuario(); montarSuporte(); avisoSuporteVyora();
   ir(isVend() ? "pdv" : "dashboard");
+  pulso();
+  tourDeBoasVindas();
 }
 /* transparência: se a Vyora estiver dentro do ambiente, a empresa vê */
 function acessoVyoraAtivo() {
@@ -1771,7 +1840,7 @@ function montarMenu() {
   var grupos = isHolding()
     ? [["Rede", ["panorama", "rede_empresas", "rede_indicadores", "rede_ranking"]],
        ["Gestão", ["rede_financeiro", "rede_alertas"]], ["Vyora", ["rede_vyora"]], ["Ajustes", ["config"]]]
-    : [["Operação", ["pdv", "dashboard", "vendas", "clientes", "produtos", "leads"]],
+    : [["Operação", ["pdv", "dashboard", "vendas", "supervisao", "clientes", "produtos", "leads"]],
        ["Gestão", ["financeiro", "negociacao", "buscar"]], ["Vyora", ["rede_vyora"]], ["Ajustes", ["config"]]];
   var fv = faturaVencida();
   var html = "";
@@ -1785,7 +1854,7 @@ function montarMenu() {
       if (m.k === "buscar" && !redeAtiva()) extra = '<span class="lk" style="width:15px;height:15px">' + ICON.lock + "</span>";
       if (m.k === "clientes" && blacklist().length) extra = '<span class="cnt">' + blacklist().length + "</span>";
       if (m.k === "config" && fv) extra = '<span class="cnt">1</span>';
-      html += '<button class="nav-i' + (View.pg === m.k ? " on" : "") + '" onclick="ir(\'' + m.k + '\')">' + (ICON[m.k] || ICON.file) + esc(m.n) + extra + "</button>";
+      html += '<button class="nav-i' + (View.pg === m.k ? " on" : "") + '" data-k="' + m.k + '" onclick="ir(\'' + m.k + '\')">' + (ICON[m.k] || ICON.file) + esc(m.n) + extra + "</button>";
     });
   });
   el("nav-list").innerHTML = html;
@@ -1803,6 +1872,8 @@ function togglePop(e) {
     '<div class="pop-i" onclick="modalPerfil()">' + ic("user") + "Meu perfil</div>" +
     (isAdmin() ? '<div class="pop-i" onclick="ir(\'config\')">' + ic("config") + "Configurações</div>" +
       '<div class="pop-i" onclick="ir(\'assinatura\')">' + ic("fatura") + "Licença e manutenção</div>" : "") +
+    (tourDaTela(View.pg) ? '<div class="pop-i" onclick="abrirTour(\'' + View.pg + '\')">' + ic("tour") + "Tour desta tela</div>" : "") +
+    '<div class="pop-i" onclick="abrirTour(\'inicio\')">' + ic("tour") + "Tour de boas-vindas</div>" +
     '<div class="pop-i" onclick="abrirSuporte()">' + ic("suporte") + "Falar com o suporte</div>" +
     '<div class="pop-i dg" onclick="sair()">' + ic("logout") + "Sair</div>";
   p.classList.toggle("hidden");
@@ -1811,7 +1882,7 @@ function ic(k, size) { return '<span style="width:' + (size || 17) + "px;height:
 document.addEventListener("click", function (e) { if (!e.target.closest(".bar-r")) el("me-pop").classList.add("hidden"); });
 
 var TITULOS = {
-  dashboard: ["Dashboard", "Visão geral do negócio"], vendas: ["Vendas", "Contratos, parcelas e situação"],
+  dashboard: ["Dashboard", "Visão geral do negócio"], supervisao: ["Supervisão de PDV", "Presença e produtividade no caixa"], vendas: ["Vendas", "Contratos, parcelas e situação"],
   clientes: ["Clientes", "Cadastro, compras e débitos"], produtos: ["Produtos", "Disponibilidade e movimentação"],
   financeiro: ["Financeiro", "Caixa, resultado e pró-labore"],
   buscar: ["Buscar", "Consulta de clientes e histórico de crédito"],
@@ -1829,6 +1900,8 @@ var TITULOS = {
 };
 function ir(pg, p) {
   View.pg = pg; View.p = p || {};
+  _tourBotaoFeito = false;
+  if (Tour.chave) fecharTour(false);
   el("nav").classList.remove("open");
   el("me-pop").classList.add("hidden");
   window.scrollTo(0, 0);
@@ -1871,7 +1944,8 @@ function semAcesso() {
 
 /* ---------- blocos ---------- */
 function head(t, s, act) {
-  return '<div class="head"><div><h2>' + esc(t) + "</h2>" + (s ? "<p>" + esc(s) + "</p>" : "") + "</div>" + (act ? '<div class="act">' + act + "</div>" : "") + "</div>";
+  return '<div class="head"><div><div class="head-t"><h2>' + esc(t) + "</h2>" + (typeof botaoTour === "function" ? botaoTour() : "") + "</div>" +
+    (s ? "<p>" + esc(s) + "</p>" : "") + "</div>" + (act ? '<div class="act">' + act + "</div>" : "") + "</div>";
 }
 function box(titulo, corpo, acoes, sub) {
   return '<div class="box">' + (titulo ? '<div class="box-h"><div><h3>' + esc(titulo) + "</h3>" + (sub ? "<p>" + esc(sub) + "</p>" : "") + "</div>" +
@@ -2040,7 +2114,7 @@ function quickSearch(t) {
     if (String(s.numero).indexOf(t) >= 0 || cliNome(s.customer_id).toLowerCase().indexOf(t) >= 0)
       out.push({ k: "Vendas", n: "#" + s.numero + " · " + cliNome(s.customer_id), s: money(s.total) + " · " + STAT[statusVenda(s)][1], go: "verVenda('" + s.id + "')" });
   });
-  if (podeVer("produtos")) Q("products").forEach(function (p) {
+  if (podeVer("produtos")) Q("products").filter(function (x) { return x.status !== "inativo"; }).forEach(function (p) {
     if ((p.nome + " " + p.cod).toLowerCase().indexOf(t) >= 0)
       out.push({ k: "Produtos", n: p.nome, s: p.estoque + " em estoque · " + money(p.preco), go: "verProduto('" + p.id + "')" });
   });
@@ -2055,15 +2129,18 @@ function quickSearch(t) {
 /* =======================================================================
    DASHBOARD
    ======================================================================= */
-var UI = { per: "mes", vBusca: "", vSt: "", lStatus: "", nTab: "cobranca", cBusca: "", cFiltro: "", pBusca: "", pCat: "", pDisp: false, fTab: "geral", rTab: "comercial", cfgTab: "empresa" };
+var UI = { per: "mes", vBusca: "", vSt: "", lStatus: "", nTab: "cobranca", cBusca: "", cFiltro: "", pBusca: "", pCat: "", pDisp: false, pArq: false, fTab: "geral", rTab: "comercial", cfgTab: "empresa" };
 function periodo() {
   var t = today();
+  if (UI.per === "tudo") return ["1900-01-01", t, "desde o início", "1900-01-01", "1900-01-01"];
   if (UI.per === "mes") return [mIni(t), mFim(t), "mês atual", mIni(addM(t, -1)), mFim(addM(t, -1))];
   if (UI.per === "90") return [addD(t, -89), t, "últimos 90 dias", addD(t, -179), addD(t, -90)];
   return [dt(t).getFullYear() + "-01-01", t, "ano de " + dt(t).getFullYear(), (dt(t).getFullYear() - 1) + "-01-01", (dt(t).getFullYear() - 1) + "-12-31"];
 }
-function segPeriodo() {
-  return '<div class="seg">' + [["mes", "Mês"], ["90", "90 dias"], ["ano", "Ano"]].map(function (o) {
+function segPeriodo(comTudo) {
+  var ops = [["mes", "Mês"], ["90", "90 dias"], ["ano", "Ano"]];
+  if (comTudo) ops.push(["tudo", "Tudo"]);
+  return '<div class="seg">' + ops.map(function (o) {
     return '<button class="' + (UI.per === o[0] ? "on" : "") + '" onclick="UI.per=\'' + o[0] + "';ir(View.pg,View.p)\">" + o[1] + "</button>";
   }).join("") + "</div>";
 }
@@ -2094,10 +2171,26 @@ function dashVazio() {
   h += primeirosPassos();
   return h;
 }
+function inventarioDoAmbiente() {
+  return [["customers", "cliente"], ["products", "produto"], ["sales", "venda"], ["parcels", "parcela"],
+    ["cash", "lançamento de caixa"], ["moves", "movimentação de estoque"], ["metas", "meta"],
+    ["cobrancas", "cobrança"], ["acordos", "acordo"], ["leads", "lead"]]
+    .map(function (x) { return { col: x[0], nome: x[1], n: Q(x[0]).length }; })
+    .filter(function (x) { return x.n > 0; });
+}
 function confirmarLimpar() {
-  confirmar("Limpar dados", "Todos os clientes, produtos, vendas e lançamentos deste ambiente serão removidos. Usuários e configurações permanecem.", function () {
-    limparDados(); toast("Ambiente limpo.", "ok"); ir("dashboard");
-  }, "Limpar tudo", true);
+  var inv = inventarioDoAmbiente();
+  if (!inv.length) return toast("Este ambiente já está vazio.", "ok");
+  var lista = inv.map(function (x) {
+    return "<li><b>" + x.n + "</b> " + esc(x.nome) + (x.n > 1 ? (x.nome.slice(-1) === "m" ? "ns" : "s") : "") + "</li>";
+  }).join("");
+  confirmar("Limpar dados de " + esc(org().nome),
+    "Vai sair deste ambiente:<ul style='margin:10px 0 12px 18px;line-height:1.9'>" + lista + "</ul>" +
+    "Ficam de pé: usuários e acessos, configurações da empresa, licença, faturas e chamados. " +
+    "Não dá para desfazer — se quiser guardar, exporte o backup antes.",
+    function () {
+      limparDados(); toast("Ambiente limpo — os cadastros agora são só seus.", "ok"); ir("dashboard");
+    }, "Limpar tudo", true);
 }
 
 /* =======================================================================
@@ -2111,7 +2204,10 @@ function pg_vendas() {
         "Registre a primeira venda: o sistema cria o contrato, o carnê de parcelas e lança os recebimentos no caixa.",
         '<button class="btn btn-p btn-lg" onclick="modalVenda()">' + ICON.plus + "Registrar venda</button>", "vendas") + "</div>";
   }
-  var lista = todas.slice();
+  var per = periodo();
+  var doPeriodo = todas.filter(function (s) { return s.data >= per[0] && s.data <= per[1]; });
+  /* a busca atravessa o período: procurar um contrato antigo não pode depender do filtro */
+  var lista = (UI.vBusca ? todas : doPeriodo).slice();
   if (UI.vBusca) {
     var t = UI.vBusca.toLowerCase();
     lista = lista.filter(function (s) { return String(s.numero).indexOf(t) >= 0 || cliNome(s.customer_id).toLowerCase().indexOf(t) >= 0; });
@@ -2120,14 +2216,15 @@ function pg_vendas() {
   lista = srt(lista, function (s) { return s.data; }, true);
   var abertas = todas.filter(function (s) { var st = statusVenda(s); return st === "ativa" || st === "atrasada"; });
 
-  var h = head("Vendas", todas.length + " vendas · clique em uma venda para abrir o contrato",
-    segPeriodo() +
+  var h = head("Vendas", doPeriodo.length + " venda(s) no " + per[2] + " · " + todas.length + " desde o início",
+    segPeriodo(true) +
     '<button class="btn" onclick="modalRelatorios(\'vendas\')">' + ICON.file + "Relatórios" + "</button>" +
     '<button class="btn btn-p" onclick="modalVenda()">' + ICON.plus + "Nova venda</button>");
   h += '<div class="grid c4" style="margin-bottom:20px">' +
-    metric("Total vendido", money(sum(todas.filter(function (s) { return statusVenda(s) !== "cancelada"; }), function (s) { return s.total; })), todas.length + " vendas") +
-    metric("Em aberto", money(sum(abertas, saldoVenda)), abertas.length + " contratos ativos") +
-    metric("Atrasadas", n0(todas.filter(function (s) { return statusVenda(s) === "atrasada"; }).length), "com parcela vencida", "neg") +
+    metric("Vendido no período", money(sum(doPeriodo.filter(function (s) { return statusVenda(s) !== "cancelada"; }), function (s) { return s.total; })),
+      doPeriodo.length + " venda(s) · " + per[2]) +
+    metric("Em aberto", money(sum(abertas, saldoVenda)), abertas.length + " contrato(s) ativo(s) — carteira toda") +
+    metric("Atrasadas", n0(todas.filter(function (s) { return statusVenda(s) === "atrasada"; }).length), "com parcela vencida, de qualquer mês", "neg") +
     metric("Quitadas", n0(todas.filter(function (s) { return statusVenda(s) === "quitada"; }).length), "contratos encerrados", "pos") +
     "</div>";
   h += '<div class="filters">' +
@@ -2135,6 +2232,7 @@ function pg_vendas() {
     '<div class="seg">' + [["", "Todas"], ["ativa", "Ativas"], ["atrasada", "Atrasadas"], ["quitada", "Quitadas"]].map(function (o) {
       return '<button class="' + (UI.vSt === o[0] ? "on" : "") + '" onclick="UI.vSt=\'' + o[0] + "';ir('vendas')\">" + o[1] + "</button>";
     }).join("") + "</div>" +
+    (UI.vBusca ? '<span class="sm mut">busca em todas as vendas</span>' : "") +
     '<div style="margin-left:auto" class="sm mut">' + lista.length + " venda(s) na lista</div></div>";
 
   if (!lista.length) return h + '<div class="box">' + vazio("Nenhuma venda com esse filtro", "Ajuste a busca ou o filtro de situação.", "", "vendas") + "</div>";
@@ -2826,27 +2924,29 @@ function vendidos(pid, dias) {
   return sum(Q("moves").filter(function (m) { return m.product_id === pid && m.tipo === "venda" && m.data.substring(0, 10) >= lim; }), function (m) { return m.qtd; });
 }
 function pg_produtos() {
-  if (!Q("products").length) {
+  var ativos = Q("products").filter(function (p) { return p.status !== "inativo"; });
+  var arquivados = Q("products").filter(function (p) { return p.status === "inativo"; });
+  if (!ativos.length && !arquivados.length) {
     return head("Produtos", "O que está disponível para vender") +
       '<div class="box">' + vazio("Nenhum produto cadastrado",
         "Cadastre os produtos com preço, custo e estoque. O sistema passa a mostrar disponibilidade, giro e margem de cada item.",
         (isAdmin() ? '<button class="btn btn-p btn-lg" onclick="modalProduto()">' + ICON.plus + "Cadastrar produto</button>" : ""), "produtos") + "</div>";
   }
-  var l = Q("products"), c = cfg();
+  var l = (UI.pArq ? arquivados : ativos).slice(), c = cfg();
   if (UI.pBusca) l = l.filter(function (p) { return (p.nome + " " + p.cod + " " + p.categoria).toLowerCase().indexOf(UI.pBusca.toLowerCase()) >= 0; });
   if (UI.pCat) l = l.filter(function (p) { return p.categoria === UI.pCat; });
   if (UI.pDisp) l = l.filter(function (p) { return p.estoque > 0; });
   l = srt(l, function (p) { return p.nome; });
-  var cats = Object.keys(grp(Q("products"), function (p) { return p.categoria; })).sort();
-  var falta = Q("products").filter(function (p) { return p.estoque <= (p.min || c.estoque_min); });
-  var top = srt(Q("products").map(function (p) { return { p: p, q: vendidos(p.id, 90) }; }), function (x) { return x.q; }, true)[0];
+  var cats = Object.keys(grp(ativos, function (p) { return p.categoria; })).sort();
+  var falta = ativos.filter(function (p) { return p.estoque <= (p.min || c.estoque_min); });
+  var top = srt(ativos.map(function (p) { return { p: p, q: vendidos(p.id, 90) }; }), function (x) { return x.q; }, true)[0];
 
   var h = head("Produtos", "O que está disponível para vender agora, quanto tem e o que mais sai",
     (isAdmin() ? '<button class="btn btn-p" onclick="modalProduto()">' + ICON.plus + "Novo produto</button>" +
       '<button class="btn" onclick="modalEstoque()">' + ICON.box + "Entrada de estoque</button>" : ""));
   h += '<div class="grid c4" style="margin-bottom:20px">' +
-    metric("Itens disponíveis", n0(sum(Q("products"), function (p) { return p.estoque; })), Q("products").length + " produtos cadastrados") +
-    metric("Valor em estoque", money(sum(Q("products"), function (p) { return p.estoque * p.custo; })), "a preço de custo") +
+    metric("Itens disponíveis", n0(sum(ativos, function (p) { return p.estoque; })), ativos.length + " produtos cadastrados") +
+    metric("Valor em estoque", money(sum(ativos, function (p) { return p.estoque * p.custo; })), "a preço de custo") +
     metric("Precisam de reposição", n0(falta.length), falta.length ? "no estoque mínimo ou abaixo" : "estoque saudável", falta.length ? "neg" : "pos") +
     metric("Mais vendido (90 dias)", top && top.q ? esc(top.p.nome.split(" ").slice(0, 2).join(" ")) : "—", top && top.q ? top.q + " unidades" : "sem saídas") +
     "</div>";
@@ -2857,6 +2957,8 @@ function pg_produtos() {
     '<select onchange="UI.pCat=this.value;ir(\'produtos\')" style="height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px"><option value="">Todas as categorias</option>' +
     cats.map(function (x) { return "<option" + (UI.pCat === x ? " selected" : "") + ">" + esc(x) + "</option>"; }).join("") + "</select>" +
     '<label class="opt" style="margin:0;height:38px"><input type="checkbox" ' + (UI.pDisp ? "checked" : "") + ' onchange="UI.pDisp=this.checked;ir(\'produtos\')"><span>Somente disponíveis</span></label>' +
+    (arquivados.length ? '<label class="opt" style="margin:0;height:38px"><input type="checkbox" ' + (UI.pArq ? "checked" : "") +
+      ' onchange="UI.pArq=this.checked;ir(\'produtos\')"><span>Ver arquivados (' + arquivados.length + ")</span></label>" : "") +
     '<div style="margin-left:auto" class="sm mut">' + l.length + " produtos listados</div></div>";
 
   h += '<div class="grid c3">' + (l.length ? l.map(function (p) {
@@ -2878,8 +2980,14 @@ function pg_produtos() {
 function verProduto(id) {
   var p = find(DB.products, id);
   if (!p || p.tenant_id !== T()) return;
-  var acoes = isAdmin() ? '<button class="btn btn-p" onclick="modalEstoque(\'' + p.id + '\')">' + ICON.plus + "Movimentar estoque</button>" +
-    '<button class="btn" onclick="modalProduto(\'' + p.id + '\')">' + ICON.edit + "Editar</button>" : "";
+  var acoes = "";
+  if (isAdmin()) {
+    acoes = p.status === "inativo"
+      ? '<button class="btn btn-p" onclick="reativarProduto(\'' + p.id + '\')">Reativar produto</button>'
+      : '<button class="btn btn-p" onclick="modalEstoque(\'' + p.id + '\')">' + ICON.plus + "Movimentar estoque</button>" +
+        '<button class="btn" onclick="modalProduto(\'' + p.id + '\')">' + ICON.edit + "Editar</button>" +
+        '<button class="btn btn-d" onclick="removerProduto(\'' + p.id + '\')">' + ICON.trash + "Excluir</button>";
+  }
   drawer(esc(p.nome), esc(p.categoria) + " · " + p.cod, [["resumo", "Disponibilidade"], ["mov", "Movimentações"]], "resumo",
     function (a) { return corpoProduto(p, a); }, acoes);
   DW.reload = function () { p = find(DB.products, id); pintarDrawer(); };
@@ -2947,6 +3055,7 @@ function modalProduto(id) {
     '<div class="fld"><label>Estoque mínimo</label><input id="p-min" type="number" value="' + (p ? (p.min || 3) : 3) + '"></div></div>' +
     '<div id="p-err" class="note ng hidden"></div>';
   modal(p ? "Editar produto" : "Novo produto", corpo,
+    (p && isAdmin() ? '<button class="btn btn-d" style="margin-right:auto" onclick="removerProduto(\'' + p.id + '\')">' + ICON.trash + "Excluir</button>" : "") +
     '<button class="btn" onclick="fecharModal()">Cancelar</button><button class="btn btn-p" onclick="salvarProduto(' + (p ? "'" + p.id + "'" : "null") + ')">Salvar</button>', true);
 }
 function salvarProduto(id) {
@@ -2971,8 +3080,52 @@ function salvarProduto(id) {
   }
   save(); fecharModal(); if (DW) recarregarDrawer(); else ir("produtos");
 }
+/* ---------- tirar um produto do catálogo ----------
+   Se ele nunca foi vendido, sai de vez. Se já entrou em alguma venda, é
+   arquivado: apagar reescreveria o histórico de vendas e o financeiro. */
+function produtoVendido(id) {
+  return Q("sales").some(function (s) {
+    return (s.itens || []).some(function (i) { return i.product_id === id; });
+  });
+}
+function removerProduto(id) {
+  var p = find(DB.products, id);
+  if (!p || p.tenant_id !== T() || !isAdmin()) return;
+  if (produtoVendido(id)) {
+    return confirmar("Arquivar " + esc(p.nome) + "?",
+      "Este produto já entrou em venda, então ele não pode ser apagado sem reescrever o histórico. " +
+      "Arquivando, ele sai do catálogo e do PDV na hora e as vendas antigas continuam corretas. Dá para reativar depois.",
+      function () { arquivarProduto(id); }, "Arquivar", true);
+  }
+  confirmar("Excluir " + esc(p.nome) + "?",
+    "O produto nunca foi vendido, então ele sai do sistema junto com as movimentações de estoque dele. Não dá para desfazer.",
+    function () { apagarProduto(id); }, "Excluir", true);
+}
+function apagarProduto(id) {
+  var p = find(DB.products, id);
+  if (!p || p.tenant_id !== T() || !isAdmin()) return;
+  if (produtoVendido(id)) return arquivarProduto(id);
+  DB.moves = DB.moves.filter(function (m) { return m.product_id !== id; });
+  DB.products = DB.products.filter(function (x) { return x.id !== id; });
+  logar("Produto excluído", p.nome);
+  save(); fecharModal(); fecharDrawer(); toast("Produto excluído.", "ok"); ir("produtos");
+}
+function arquivarProduto(id) {
+  var p = find(DB.products, id);
+  if (!p || p.tenant_id !== T() || !isAdmin()) return;
+  p.status = "inativo"; p.arquivado = new Date().toISOString();
+  logar("Produto arquivado", p.nome);
+  save(); fecharModal(); fecharDrawer(); toast("Produto arquivado — some do catálogo e do PDV.", "ok"); ir("produtos");
+}
+function reativarProduto(id) {
+  var p = find(DB.products, id);
+  if (!p || p.tenant_id !== T() || !isAdmin()) return;
+  p.status = "ativo"; delete p.arquivado;
+  logar("Produto reativado", p.nome);
+  save(); fecharModal(); fecharDrawer(); toast("Produto de volta ao catálogo.", "ok"); ir("produtos");
+}
 function modalEstoque(pid) {
-  var prods = srt(Q("products"), function (p) { return p.nome; });
+  var prods = srt(Q("products").filter(function (p) { return p.status !== "inativo"; }), function (p) { return p.nome; });
   var corpo = '<div class="fld"><label>Produto</label><select id="e-prod">' + prods.map(function (p) {
     return '<option value="' + p.id + '"' + (pid === p.id ? " selected" : "") + ">" + esc(p.nome) + " — " + p.estoque + " em estoque</option>";
   }).join("") + "</select></div>" +
@@ -4735,6 +4888,7 @@ function pg_config(p) {
     ["empresa", "Empresa", "empresa", "Dados cadastrais e identidade visual"],
     ["equipe", "Equipe", "users", "Quem participa da operação"],
     ["sistema", "Sistema", "config", "Regras do negócio e preferências"],
+    ["historico", "Histórico mensal", "relatorios", "Como cada mês fechou, um ao lado do outro"],
     ["seguranca", "Segurança", "seguranca", "Acessos, atividade e dados"]
   ];
   var h = head("Configurações", "Central de configuração de " + t.nome,
@@ -4859,11 +5013,15 @@ function pg_config(p) {
       box("Dados do ambiente", '<div class="box-b">' +
         '<p class="sm mut" style="margin-bottom:16px;line-height:1.7">O backup sai protegido por senha e leva tudo: clientes, vendas, parcelas e financeiro. ' +
         'Faça um antes de qualquer manutenção.</p>' +
-        '<button class="btn btn-d" style="width:100%" onclick="confirmarLimpar()">Limpar dados operacionais</button>' +
+        '<button class="btn btn-d" style="width:100%" onclick="confirmarLimpar()">Limpar clientes, produtos, vendas e financeiro</button>' +
         '<div style="border-top:1px solid var(--line-2);margin:18px 0 14px"></div>' +
         '<button class="btn" onclick="backup()">' + ICON.down + "Exportar backup</button> " +
         '<button class="btn" onclick="el(\'restore\').click()">Restaurar backup</button>' +
         '<input type="file" id="restore" accept="application/json" class="hidden" onchange="restaurarBackup(this)"></div>') + "</div>";
+  }
+
+  if (tab === "historico") {
+    h += corpoHistorico();
   }
 
   if (tab === "seguranca") {
@@ -5342,6 +5500,620 @@ function copiarCodigo() {
 /* =======================================================================
    INÍCIO
    ======================================================================= */
+
+/* =======================================================================
+   HISTÓRICO MENSAL — o mês vira página virada, sem apagar nada
+
+   O painel e as metas trabalham sempre no mês corrente: no dia 1º os
+   números do topo voltam a zero porque passam a contar o mês novo. Nada
+   é excluído — o mês fechado fica aqui, mês a mês, para comparar.
+   ======================================================================= */
+function mesesComMovimento() {
+  var m = {};
+  Q("sales").forEach(function (s) { if (s.status !== "cancelada") m[mesRef(s.data)] = 1; });
+  Q("cash").forEach(function (x) { m[mesRef(x.data)] = 1; });
+  Q("customers").forEach(function (c) { if (c.criado) m[mesRef(c.criado)] = 1; });
+  Q("metas").forEach(function (x) { if (x.mes) m[x.mes] = 1; });
+  m[mesRef(today())] = 1;
+  return Object.keys(m).sort().reverse();
+}
+function fechamentoMensal(mes) {
+  var ini = mes + "-01", fim = mFim(ini);
+  var vs = vendasPeriodo(ini, fim, null);
+  var r = resultado(ini, fim);
+  var novos = Q("customers").filter(function (c) { return c.criado && mesRef(c.criado) === mes; }).length;
+  var ps = Q("parcels").filter(function (p) { return p.venc >= ini && p.venc <= fim; });
+  var emAtraso = ps.filter(function (p) { return p.status === "vencida"; });
+  var metas = metasDoMes(mes).map(function (m) {
+    var pr = progressoMeta(m);
+    return { titulo: m.titulo, alvo: m.alvo, realizado: pr.realizado, pct: pr.pct, ok: pr.pct >= 100, fmt: pr.fmt };
+  });
+  return {
+    mes: mes, rotulo: mLbl(ini), inicio: ini, fim: fim,
+    vendas: vs.length,
+    faturamento: r.receita,
+    ticket: vs.length ? r2(r.receita / vs.length) : 0,
+    recebido: r.recebido,
+    saidas: r.saidasTotal,
+    resultado: r.liquido,
+    margem: r.margem,
+    clientes_novos: novos,
+    a_vencer: r2(sum(ps.filter(function (p) { return p.status === "aberta"; }), function (p) { return p.valor; })),
+    vencido: r2(sum(emAtraso, function (p) { return r2(p.valor - (p.pago || 0)); })),
+    vencidas_qtd: emAtraso.length,
+    metas: metas,
+    fechado: fim < today()
+  };
+}
+function historicoMensal(limite) {
+  return mesesComMovimento().slice(0, limite || 24).map(fechamentoMensal);
+}
+function linhasHistorico() {
+  var l = historicoMensal(36);
+  return [["Mês", "Vendas", "Faturamento", "Ticket médio", "Recebido em caixa", "Saídas", "Resultado",
+    "Margem %", "Clientes novos", "A vencer", "Vencido", "Metas batidas"]].concat(l.map(function (x) {
+    return [x.rotulo, x.vendas, x.faturamento, x.ticket, x.recebido, x.saidas, x.resultado,
+      r2(x.margem), x.clientes_novos, x.a_vencer, x.vencido,
+      x.metas.length ? x.metas.filter(function (m) { return m.ok; }).length + " de " + x.metas.length : "—"];
+  }));
+}
+function exportarHistorico() {
+  csv("historico-mensal-" + (org().slug || "empresa") + ".csv", linhasHistorico());
+}
+function cardMes(x, ant) {
+  function seta(atual, anterior, inverso) {
+    if (anterior === 0 || anterior == null) return "";
+    var d = (atual - anterior) / Math.abs(anterior) * 100;
+    if (!isFinite(d) || Math.abs(d) < 0.5) return '<span class="mut">estável</span>';
+    var bom = inverso ? d < 0 : d > 0;
+    return '<span class="' + (bom ? "up" : "dn") + '">' + (d > 0 ? "▲" : "▼") + " " + pc(Math.abs(d)) + "</span>";
+  }
+  var metasOk = x.metas.filter(function (m) { return m.ok; }).length;
+  return '<div class="hm">' +
+    '<div class="hm-h"><b>' + esc(x.rotulo) + "</b>" +
+    (x.fechado ? '<span class="tag t-mut">fechado</span>' : '<span class="tag t-inf">em andamento</span>') +
+    (x.metas.length ? '<span class="tag ' + (metasOk === x.metas.length ? "t-pos" : "t-wr") + '">' +
+      metasOk + " de " + x.metas.length + " meta(s)</span>" : "") + "</div>" +
+    '<div class="hm-g">' +
+    '<div><span>Faturamento</span><b>' + money(x.faturamento) + "</b>" + (ant ? seta(x.faturamento, ant.faturamento) : "") + "</div>" +
+    '<div><span>Vendas</span><b>' + n0(x.vendas) + "</b>" + (ant ? seta(x.vendas, ant.vendas) : "") + "</div>" +
+    '<div><span>Ticket médio</span><b>' + money(x.ticket) + "</b>" + (ant ? seta(x.ticket, ant.ticket) : "") + "</div>" +
+    '<div><span>Recebido em caixa</span><b>' + money(x.recebido) + "</b>" + (ant ? seta(x.recebido, ant.recebido) : "") + "</div>" +
+    '<div><span>Saídas</span><b>' + money(x.saidas) + "</b>" + (ant ? seta(x.saidas, ant.saidas, true) : "") + "</div>" +
+    '<div><span>Resultado</span><b class="' + (x.resultado < 0 ? "dn" : "up") + '">' + money(x.resultado) + "</b>" +
+      (ant ? seta(x.resultado, ant.resultado) : "") + "</div>" +
+    '<div><span>Clientes novos</span><b>' + n0(x.clientes_novos) + "</b>" + (ant ? seta(x.clientes_novos, ant.clientes_novos) : "") + "</div>" +
+    '<div><span>Vencido no mês</span><b class="' + (x.vencido > 0 ? "dn" : "") + '">' + money(x.vencido) + "</b>" +
+      '<span class="mut">' + x.vencidas_qtd + " parcela(s)</span></div>" +
+    "</div>" +
+    (x.metas.length ? '<div class="hm-m">' + x.metas.map(function (m) {
+      return "<span" + (m.ok ? ' class="ok"' : "") + ">" + esc(m.titulo) + " · " + pc(m.pct) + "</span>";
+    }).join("") + "</div>" : "") +
+    "</div>";
+}
+function corpoHistorico() {
+  var l = historicoMensal(24);
+  if (l.length <= 1 && !l[0].vendas && !l[0].recebido && !l[0].saidas) {
+    return '<div class="box">' + vazio("Ainda não há mês fechado",
+      "O histórico se monta sozinho conforme a operação acontece. No fim do primeiro mês, ele já mostra faturamento, resultado, clientes novos e metas.",
+      "", "relatorios") + "</div>";
+  }
+  var maior = Math.max.apply(null, l.map(function (x) { return x.faturamento; }).concat([1]));
+  var barras = l.slice(0, 12).slice().reverse();
+  var h = box("Faturamento mês a mês", '<div class="box-b"><div class="hbars">' + barras.map(function (x, i) {
+    return '<div class="hb"><div class="hb-t">' + moneyShort(x.faturamento) + "</div>" +
+      '<div class="hb-c"><span id="hb-' + i + '" style="height:' + (maior > 0 ? Math.max(2, x.faturamento / maior * 100) : 2) + '%"></span></div>' +
+      '<div class="hb-l">' + esc(x.rotulo) + "</div></div>";
+  }).join("") + "</div></div>",
+    '<button class="btn btn-s" onclick="exportarHistorico()">' + ICON.down + "Exportar CSV</button>",
+    "Cada barra é um mês fechado da própria operação — nada é digitado aqui.");
+  h += '<div style="height:18px"></div>';
+  h += l.map(function (x, i) { return cardMes(x, l[i + 1]); }).join("");
+  return h;
+}
+
+/* =======================================================================
+   SUPERVISÃO DE PDV — quem está no caixa agora e o que cada um produz
+
+   Só o administrador vê. Nada aqui é estimado: presença vem do pulso de
+   sessão (gravado a cada minuto no próprio usuário) e produtividade vem
+   das vendas registradas no período.
+   ======================================================================= */
+var ONLINE_MIN = 4;
+
+/* pulso de presença — o sistema marca que a pessoa continua no ar */
+function pulso() {
+  var u = me();
+  if (!u) return;
+  if (u.visto && (new Date() - new Date(u.visto)) < 45000) return;
+  u.visto = new Date().toISOString();
+  save();
+}
+function minutosDesde(iso) {
+  if (!iso) return null;
+  var m = (new Date() - new Date(iso)) / 60000;
+  return m >= 0 ? m : null;
+}
+function estaOnline(u) {
+  var m = minutosDesde(u && u.visto);
+  return m !== null && m < ONLINE_MIN;
+}
+function hMin(iso) {
+  var m = minutosDesde(iso);
+  if (m === null) return "nunca entrou";
+  if (m < 1) return "agora mesmo";
+  if (m < 60) return "há " + Math.floor(m) + " min";
+  if (m < 1440) return "há " + Math.floor(m / 60) + "h";
+  return "há " + Math.floor(m / 1440) + " dia(s)";
+}
+function operadoresPdv() {
+  return DB.users.filter(function (u) {
+    return u.tenant_id === T() && u.perfil === "vendedor" && u.status !== "inativo";
+  });
+}
+/* produtividade de cada operador no período — vendas canceladas não contam */
+function produtividadePdv(ini, fim) {
+  var vs = Q("sales").filter(function (s) {
+    return s.status !== "cancelada" && s.data >= ini && s.data <= fim;
+  });
+  var totalGeral = sum(vs, function (s) { return s.total; });
+  var hoje = today();
+  return operadoresPdv().map(function (u) {
+    var minhas = vs.filter(function (s) { return s.seller_id === u.id; });
+    var fat = r2(sum(minhas, function (s) { return s.total; }));
+    var dias = {};
+    minhas.forEach(function (s) { dias[s.data] = 1; });
+    var diasAtivos = Object.keys(dias).length;
+    var doDia = minhas.filter(function (s) { return s.data === hoje; });
+    var ultima = minhas.slice().sort(function (a, b) { return a.data < b.data ? 1 : -1; })[0];
+    return {
+      user: u, nome: u.nome, online: estaOnline(u), visto: u.visto || null,
+      vendas: minhas.length, faturamento: fat,
+      ticket: minhas.length ? r2(fat / minhas.length) : 0,
+      dias_ativos: diasAtivos,
+      por_dia: diasAtivos ? r2(minhas.length / diasAtivos) : 0,
+      parte: totalGeral > 0 ? r2(fat / totalGeral * 100) : 0,
+      hoje_vendas: doDia.length,
+      hoje_faturamento: r2(sum(doDia, function (s) { return s.total; })),
+      ultima_venda: ultima ? ultima.data : null
+    };
+  }).sort(function (a, b) { return b.faturamento - a.faturamento; });
+}
+function pg_supervisao() {
+  var per = periodo(), ini = per[0], fim = per[1];
+  var ops = operadoresPdv();
+  if (!ops.length) {
+    return head("Supervisão de PDV", "Presença e produtividade de quem opera o caixa") +
+      '<div class="box">' + vazio("Nenhum PDV em operação",
+        "A supervisão aparece quando existe pelo menos um login de vendedor. Cada vendedor ocupa uma vaga de PDV da licença e recebe a tela de venda ao entrar.",
+        '<button class="btn btn-p btn-lg" onclick="ir(\'config\',{tab:\'equipe\'})">' + ICON.plus + "Criar acesso de vendedor</button>", "pdv") + "</div>";
+  }
+  var l = produtividadePdv(ini, fim);
+  var online = l.filter(function (x) { return x.online; }).length;
+  var vendasT = sum(l, function (x) { return x.vendas; });
+  var fatT = r2(sum(l, function (x) { return x.faturamento; }));
+  var vagas = limiteContratado("pdvs");
+
+  var h = head("Supervisão de PDV", "Presença e produtividade no caixa — " + per[2], segPeriodo());
+  h += '<div class="grid c4">' +
+    metric("No caixa agora", '<span class="pdv-on-n">' + online + "</span> <span class='mut' style='font-size:15px'>de " + ops.length + "</span>",
+      online ? "atualiza sozinho a cada minuto" : "ninguém conectado neste momento", online ? "pos" : "") +
+    metric("Vendas no período", n0(vendasT), vendasT ? "média de " + r2(vendasT / ops.length) + " por operador" : "sem vendas registradas") +
+    metric("Faturamento pelo PDV", money(fatT), fatT ? "ticket médio " + money(vendasT ? fatT / vendasT : 0) : "—") +
+    metric("Vagas de PDV", ops.length + (vagas ? " de " + vagas : ""), vagas && ops.length >= vagas ? "licença no limite" : "definidas na licença") +
+    "</div>";
+
+  h += '<div style="height:18px"></div>';
+  h += box("No caixa agora", '<div class="box-b">' + l.map(function (x, i) {
+    return '<div class="pdv-sup"' + (i ? ' style="border-top:1px solid var(--line-2)"' : "") + ">" +
+      '<span class="av">' + ini2(x.nome) + "</span>" +
+      '<div style="flex:1;min-width:0"><b>' + esc(x.nome) + "</b>" +
+      '<div class="sm mut">' + (x.online ? "no sistema · " + hMin(x.visto) : "último acesso " + hMin(x.visto)) + "</div></div>" +
+      '<div class="sm" style="text-align:right"><b>' + n0(x.hoje_vendas) + "</b> venda(s) hoje" +
+      '<div class="mut">' + money(x.hoje_faturamento) + "</div></div>" +
+      '<span class="ponto ' + (x.online ? "on" : "off") + '" title="' + (x.online ? "online" : "offline") + '"></span>' +
+      "</div>";
+  }).join("") + "</div>",
+    '<button class="btn btn-s" onclick="ir(View.pg,View.p)">Atualizar</button>',
+    "Presença medida pelo pulso da sessão — considera online quem deu sinal nos últimos " + ONLINE_MIN + " minutos.");
+
+  h += '<div style="height:18px"></div>';
+  var lider = l[0] ? l[0].faturamento : 0;
+  h += box("Produtividade no período", '<div class="box-b">' + l.map(function (x, i) {
+    ANIM.push({ tipo: "bar", sel: "pv-" + i, w: lider > 0 ? Math.min(100, x.faturamento / lider * 100) : 0 });
+    return '<div style="padding:14px 0' + (i ? ";border-top:1px solid var(--line-2)" : "") + '">' +
+      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">' +
+      "<b>" + esc(x.nome) + "</b><b>" + money(x.faturamento) + "</b></div>" +
+      '<div class="qbar" style="height:8px;margin-top:7px"><span id="pv-' + i + '" style="background:' +
+      (i === 0 && x.faturamento > 0 ? "var(--grow)" : "var(--brand)") + '"></span></div>' +
+      '<div class="sm mut" style="margin-top:6px">' + n0(x.vendas) + " vendas · ticket " + money(x.ticket) +
+      " · " + x.dias_ativos + " dia(s) com venda · " + x.por_dia + " venda(s) por dia ativo · " +
+      pc(x.parte) + " do faturamento" + (x.ultima_venda ? " · última em " + fdate(x.ultima_venda) : " · sem venda no período") +
+      "</div></div>";
+  }).join("") + "</div>", "", "Produtividade = vendas registradas por cada operador nos dias em que ele vendeu. Venda cancelada não entra.");
+  return h;
+}
+
+/* =======================================================================
+   TOUR GUIADO — explicação contextual, dentro da tela
+
+   REGRA DA CASA: todo módulo entregue a uma empresa tem tour. Se um item
+   do MENU ficar sem passos, o teste automático (vtest) quebra de propósito.
+
+   Dois tipos:
+   1. Boas-vindas — abre sozinho no primeiro acesso de cada pessoa, uma vez.
+   2. Mini tour do módulo — pelo botão "Mostrar Tour" ao lado do título.
+
+   O que cada um já viu fica gravado no usuário (DB.users[].tours), não no
+   navegador: a pessoa troca de máquina e o sistema continua sabendo.
+   ======================================================================= */
+var TOURS = {
+  /* ---------------- boas-vindas (primeiro acesso) ---------------- */
+  inicio: {
+    nome: "Boas-vindas", auto: true,
+    passos: [
+      { alvo: "#nav", pos: "dir", t: "Tudo começa por aqui",
+        d: "O menu reúne os módulos que a sua empresa contratou, separados por Operação, Gestão e Ajustes. Só aparece o que você tem permissão para ver." },
+      { alvo: "#page .head", pos: "baixo", t: "Cada tela se explica",
+        d: "Ao lado do título de todo módulo existe um botão de tour. Quando bater dúvida, é ali — a explicação acontece na própria tela, com os seus dados." },
+      { alvo: "#gq", pos: "baixo", t: "Busca de qualquer coisa",
+        d: "Cliente, venda ou produto: digite aqui e o sistema encontra sem você precisar saber em qual módulo aquilo mora." },
+      { alvo: ".bar-r .me", pos: "baixo", t: "Seu perfil e o suporte",
+        d: "Trocar a senha, falar com o suporte da Vyora ou rever este tour: está tudo neste canto. Bom trabalho." }
+    ]
+  },
+
+  /* ---------------- perfil administrador ---------------- */
+  dashboard: {
+    nome: "Dashboard",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "O resumo do mês",
+        d: "Esta tela responde três perguntas: quanto entrou, quanto falta entrar e como a equipe está indo. Tudo calculado a partir dos lançamentos reais — nada é digitado aqui." },
+      { alvo: "#page .grid", pos: "baixo", t: "Os números do topo",
+        d: "Cada cartão compara com o período anterior. Verde é evolução, vermelho é queda. Clique num cartão para abrir a lista que gerou aquele número." },
+      { alvo: "#page .box", pos: "cima", t: "Meta e progresso",
+        d: "A meta do mês é definida no Financeiro. Enquanto ela existir, o dashboard mostra o quanto já foi cumprido e quanto falta por dia útil." },
+      { alvo: ".nav-i[data-k='vendas']", pos: "dir", t: "Do resumo para o detalhe",
+        d: "Quando algum número chamar atenção, o caminho é sempre o mesmo: abrir o módulo correspondente e olhar linha por linha." }
+    ]
+  },
+  vendas: {
+    nome: "Vendas",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Toda venda vira contrato",
+        d: "Aqui ficam as vendas fechadas, à vista ou parceladas, com o contrato, as parcelas e a situação de cada uma." },
+      { alvo: "#page .head .act", pos: "baixo", t: "Registrar uma venda",
+        d: "Ao registrar, o sistema já dá baixa no estoque, gera as parcelas com vencimento e joga o valor no financeiro. Um lançamento só, três consequências." },
+      { alvo: "#page .box", pos: "cima", t: "A situação de cada uma",
+        d: "Ativa, atrasada, quitada ou cancelada. Clique na linha para abrir a venda, ver o histórico de pagamento e imprimir contrato ou carnê." }
+    ]
+  },
+  clientes: {
+    nome: "Clientes",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "A carteira da empresa",
+        d: "Cada cliente carrega o que comprou, o que já pagou e o que ainda deve. O cadastro é do negócio, não do vendedor." },
+      { alvo: "#page .head .act", pos: "baixo", t: "Cadastrar",
+        d: "Telefone e nome bastam para começar. O resto pode ser completado depois — o importante é não perder o contato." },
+      { alvo: "#page .box", pos: "cima", t: "Quem está bloqueado",
+        d: "Clientes bloqueados para novas vendas aparecem marcados. O bloqueio é uma decisão da empresa, registrada com motivo e responsável." }
+    ]
+  },
+  produtos: {
+    nome: "Produtos",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Catálogo e estoque juntos",
+        d: "Preço, custo e quantidade disponível no mesmo lugar. A venda desconta automaticamente; a entrada de mercadoria você lança aqui." },
+      { alvo: "#page .head .act", pos: "baixo", t: "Entrada e ajuste",
+        d: "Toda movimentação fica registrada com data e responsável. Se o estoque não bate, o histórico mostra onde a conta se perdeu." },
+      { alvo: "#page .box", pos: "cima", t: "O que está acabando",
+        d: "Produtos abaixo do mínimo aparecem em destaque. É o aviso para comprar antes de perder a venda." }
+    ]
+  },
+  financeiro: {
+    nome: "Financeiro",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "O caixa de verdade",
+        d: "Entradas, saídas, resultado e pró-labore. O que aparece aqui é o que foi efetivamente lançado — sem estimativa e sem ajuste manual." },
+      { alvo: "#page .box", pos: "baixo", t: "Cada aba, uma pergunta",
+        d: "Visão geral mostra o saldo; Resultado mostra o lucro; Contas futuras mostra o que ainda vai entrar e sair. Metas define o alvo do mês." },
+      { alvo: "#page .head .act", pos: "baixo", t: "Lançar",
+        d: "Despesa, aporte ou receita avulsa entram por aqui. Venda não precisa: ela já chega sozinha do módulo de Vendas." },
+      { alvo: ".nav-i[data-k='negociacao']", pos: "dir", t: "Quando atrasa",
+        d: "Parcela vencida deixa de ser assunto do financeiro e vira assunto da Negociação, com régua de cobrança própria." }
+    ]
+  },
+  negociacao: {
+    nome: "Negociação",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "A régua de cobrança",
+        d: "Quem atrasou, há quantos dias e quanto deve. A lista se atualiza sozinha conforme as parcelas vencem." },
+      { alvo: "#page .box", pos: "cima", t: "Do aviso ao acordo",
+        d: "Cada contato fica registrado. Quando o cliente propõe um novo prazo, o acordo entra no sistema e passa a valer no lugar das parcelas antigas." },
+      { alvo: "#page .head .act", pos: "baixo", t: "Bloquear é decisão da casa",
+        d: "Bloquear impede novas vendas para aquele cliente e exige motivo. É reversível, e tudo fica no histórico." }
+    ]
+  },
+  buscar: {
+    nome: "Vyora Buscar",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Consulta entre empresas da rede",
+        d: "Serve para checar o histórico de um cliente antes de vender parcelado. Só funciona se a sua empresa participar da rede." },
+      { alvo: "#page .box", pos: "cima", t: "O que aparece — e o que não aparece",
+        d: "Você vê a situação (em dia, em atraso), nunca os dados comerciais da outra empresa. Reciprocidade: quem consulta também é consultado." }
+    ]
+  },
+  leads: {
+    nome: "Leads · CRM",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Todo contato entra aqui",
+        d: "Este é o CRM do Vyora Growth. Cada pessoa que demonstra interesse vira um lead com origem registrada — anúncio, indicação ou balcão." },
+      { alvo: "#page .box", pos: "cima", t: "Etapas até a venda",
+        d: "Novo, em contato, convertido ou encerrado. O que não avança há dias fica visível: é ali que a venda costuma se perder." },
+      { alvo: ".nav-i[data-k='vendas']", pos: "dir", t: "Quando vira cliente",
+        d: "Lead convertido gera cliente e venda com a origem preservada. É assim que se sabe qual campanha realmente trouxe dinheiro." }
+    ]
+  },
+  config: {
+    nome: "Configurações",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "A central da empresa",
+        d: "Dados da empresa, equipe, permissões, backup e licença. É a tela que o administrador abre para organizar a casa." },
+      { alvo: "#page .box", pos: "baixo", t: "Equipe e acessos",
+        d: "Cada login tem um perfil: administrador vê tudo, vendedor vê só o comercial. Criar um vendedor libera o PDV para ele — e ocupa uma vaga da licença." },
+      { alvo: "#page .box", pos: "cima", t: "Histórico mensal",
+        d: "No dia 1º o painel recomeça a contar o mês novo — nada é apagado. O mês que passou fica em Histórico mensal, com faturamento, resultado, clientes novos e metas para comparar." },
+      { alvo: "#page .head .act", pos: "baixo", t: "Backup é seu",
+        d: "A exportação completa fica disponível aqui, a qualquer momento. Os dados são da empresa, e sair nunca depende de pedir autorização." }
+    ]
+  },
+  assinatura: {
+    nome: "Licença e manutenção",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "O que está contratado",
+        d: "Plano, módulos liberados, vagas de acesso e valor da manutenção. Tudo o que a Vyora registrou para a sua empresa." },
+      { alvo: "#page .box", pos: "cima", t: "Faturas e ampliação",
+        d: "As faturas ficam listadas com vencimento e situação. Precisando de mais vagas ou de um módulo novo, o pedido sai desta tela." }
+    ]
+  },
+  pdv: {
+    nome: "Vender",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Sua tela de venda",
+        d: "Aqui você monta a venda: escolhe os produtos, define o cliente e fecha. É a única tela que você precisa dominar para trabalhar." },
+      { alvo: "#page .pdv-grid", pos: "dir", t: "Toque para adicionar",
+        d: "Cada cartão é um produto, com preço e disponibilidade. Sem estoque, ele fica bloqueado — não dá para vender o que não existe." },
+      { alvo: "#page .pdv-cart", pos: "esq", t: "O carrinho",
+        d: "Dá para ajustar a quantidade, remover item e ver o total. Nada é gravado enquanto você não fechar a venda." },
+      { alvo: ".nav-i[data-k='vendas']", pos: "dir", t: "Depois de fechar",
+        d: "A venda vai para o módulo Vendas com contrato e parcelas. Se for parcelada, o carnê já sai pronto para imprimir." }
+    ]
+  },
+  supervisao: {
+    nome: "Supervisão de PDV",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "O caixa sob o seu olho",
+        d: "Quem está operando agora e o quanto cada um produziu no período. Serve para acompanhar equipe de venda sem precisar ficar perguntando." },
+      { alvo: "#page .grid", pos: "baixo", t: "Presença de verdade",
+        d: "Online é quem deu sinal de vida nos últimos minutos — o sistema marca sozinho enquanto a pessoa está com a tela aberta. Não é estimativa." },
+      { alvo: "#page .box", pos: "cima", t: "Produtividade por operador",
+        d: "Vendas, ticket médio, dias em que vendeu e participação no faturamento. Venda cancelada não conta para ninguém." },
+      { alvo: ".nav-i[data-k='config']", pos: "dir", t: "Cada vendedor é uma vaga",
+        d: "Os operadores aparecem aqui assim que ganham login de vendedor em Configurações. Cada um ocupa uma vaga de PDV da licença." }
+    ]
+  },
+  rede_vyora: {
+    nome: "Rede Vyora",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Seu canal com a Vyora",
+        d: "Suporte, chamados e novidades da plataforma. É por aqui que a sua empresa fala com quem construiu o sistema." },
+      { alvo: "#page .box", pos: "cima", t: "Chamados com prazo",
+        d: "Cada pedido tem prioridade e prazo de resposta. O histórico fica registrado dos dois lados — ninguém precisa lembrar de cabeça." }
+    ]
+  },
+
+  /* ---------------- perfil gestor da rede (holding) ---------------- */
+  panorama: {
+    nome: "Panorama",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "O grupo em uma tela",
+        d: "Os números consolidados das empresas da rede: faturamento somado, recebimento e evolução. Nenhum dado individual de cliente aparece aqui." },
+      { alvo: "#page .grid", pos: "baixo", t: "O que estes números são",
+        d: "Somatórios calculados na hora, a partir do que cada empresa lançou. Se uma empresa não lançou, ela não entra — e isso também é informação." },
+      { alvo: ".nav-i[data-k='rede_empresas']", pos: "dir", t: "Descer ao nível da empresa",
+        d: "Em Empresas você abre os números de uma unidade específica. Continua sendo número: a operação pertence a quem opera." }
+    ]
+  },
+  rede_empresas: {
+    nome: "Empresas",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "As empresas da rede",
+        d: "Cada empresa vinculada ao grupo, com situação da licença e desempenho no período." },
+      { alvo: "#page .box", pos: "cima", t: "O limite é o número",
+        d: "Ao abrir uma empresa você vê faturamento, recebimento e metas — nunca clientes, leads ou contratos. A separação é estrutural, não uma configuração." },
+      { alvo: "#page .head .act", pos: "baixo", t: "Nova empresa no grupo",
+        d: "O grupo não cria empresas sozinho: o pedido vai para a Vyora, que confere a licença e faz o cadastro." }
+    ]
+  },
+  rede_indicadores: {
+    nome: "Indicadores",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Comparar é o objetivo",
+        d: "Os mesmos indicadores para todas as empresas, no mesmo período. É o que permite dizer que uma vai melhor que a outra sem achismo." },
+      { alvo: "#page .box", pos: "cima", t: "Efeito do Growth",
+        d: "Quando uma empresa contrata o Vyora Growth, o sistema marca a data e compara o antes e o depois. O crescimento aparece medido, não prometido." }
+    ]
+  },
+  rede_ranking: {
+    nome: "Ranking",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Quem puxa o grupo",
+        d: "Classificação das empresas no período escolhido. Serve para reconhecer quem vai bem e para chegar cedo em quem está travando." },
+      { alvo: "#page .box", pos: "cima", t: "Sem exposição de operação",
+        d: "O ranking usa somas do período. Nenhuma empresa da rede enxerga a carteira ou os clientes da outra." }
+    ]
+  },
+  rede_financeiro: {
+    nome: "Financeiro da rede",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "O caixa somado",
+        d: "Entradas e saídas consolidadas do grupo, no período escolhido. Serve para a decisão do dono do grupo, não para a rotina da empresa." },
+      { alvo: "#page .box", pos: "cima", t: "De onde vem cada número",
+        d: "Tudo nasce dos lançamentos das empresas. Se algo parecer estranho, o caminho é olhar a empresa que gerou o valor." }
+    ]
+  },
+  rede_alertas: {
+    nome: "Alertas",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "O que precisa de atenção",
+        d: "Queda de faturamento, inadimplência subindo, licença vencendo. O sistema levanta a mão antes de o problema virar prejuízo." },
+      { alvo: "#page .box", pos: "cima", t: "Alerta é convite para conversar",
+        d: "Cada alerta aponta a empresa e o motivo. A ação continua sendo humana: falar com quem toca a operação." }
+    ]
+  }
+};
+
+var Tour = { chave: "", passos: [], i: 0, raiz: null, esc: null };
+/* o fundo não rola enquanto o tour está aberto */
+function travarFundo(ligar) {
+  var b = document.body;
+  if (!b || !b.classList) return;
+  if (ligar) b.classList.add("tour-on"); else b.classList.remove("tour-on");
+}
+
+function tourDaTela(k) {
+  var t = TOURS[k];
+  return t && t.passos && t.passos.length ? t : null;
+}
+function tourVisto(chave) {
+  var u = me();
+  return !!(u && u.tours && u.tours[chave]);
+}
+function marcarTourVisto(chave) {
+  var u = me();
+  if (!u) return;
+  u.tours = u.tours || {};
+  u.tours[chave] = new Date().toISOString();
+  save();
+}
+/* botão discreto ao lado do título — só onde existe tour */
+var _tourBotaoFeito = false;
+function botaoTour() {
+  if (_tourBotaoFeito) return "";
+  var t = tourDaTela(View.pg);
+  if (!t) return "";
+  _tourBotaoFeito = true;
+  return '<button class="bt-tour' + (tourVisto(View.pg) ? "" : " novo") + '" onclick="abrirTour(\'' + View.pg +
+    '\')" title="Ver como esta tela funciona">' + ICON.tour + "Mostrar Tour</button>";
+}
+
+function abrirTour(chave) {
+  var t = tourDaTela(chave);
+  if (!t) return;
+  Tour.chave = chave; Tour.passos = t.passos; Tour.i = 0;
+  if (!Tour.raiz) {
+    Tour.raiz = document.createElement("div");
+    Tour.raiz.id = "tour";
+    document.body.appendChild(Tour.raiz);
+  }
+  Tour.raiz.classList.remove("hidden");
+  travarFundo(true);
+  Tour.esc = function (e) {
+    if (e.key === "Escape") fecharTour(false);
+    else if (e.key === "ArrowRight") passoSeguinte();
+    else if (e.key === "ArrowLeft") passoAnterior();
+  };
+  document.addEventListener("keydown", Tour.esc);
+  window.addEventListener("resize", pintarTour);
+  window.addEventListener("scroll", pintarTour, true);
+  pintarTour();
+}
+function fecharTour(concluido) {
+  if (!Tour.raiz) return;
+  if (concluido) marcarTourVisto(Tour.chave);
+  Tour.raiz.classList.add("hidden");
+  Tour.raiz.innerHTML = "";
+  travarFundo(false);
+  if (document.removeEventListener) document.removeEventListener("keydown", Tour.esc);
+  if (window.removeEventListener) {
+    window.removeEventListener("resize", pintarTour);
+    window.removeEventListener("scroll", pintarTour, true);
+  }
+  Tour.chave = ""; Tour.passos = []; Tour.i = 0;
+  var b = document.querySelector ? document.querySelector(".bt-tour.novo") : null;
+  if (b && concluido) b.classList.remove("novo");
+}
+function passoSeguinte() {
+  if (Tour.i >= Tour.passos.length - 1) return fecharTour(true);
+  Tour.i++; pintarTour();
+}
+function passoAnterior() {
+  if (Tour.i <= 0) return;
+  Tour.i--; pintarTour();
+}
+function pintarTour() {
+  if (!Tour.raiz || !Tour.passos.length) return;
+  var p = Tour.passos[Tour.i], alvo = p.alvo ? document.querySelector(p.alvo) : null;
+  var r = alvo && alvo.getBoundingClientRect ? alvo.getBoundingClientRect() : null;
+  if (r && (r.width < 2 || r.height < 2)) r = null;
+  /* traz o alvo para a tela antes de medir */
+  if (r && (r.top < 60 || r.bottom > window.innerHeight - 60) && alvo.scrollIntoView) {
+    alvo.scrollIntoView({ block: "center", behavior: "smooth" });
+    r = alvo.getBoundingClientRect();
+  }
+  var pad = 7, foco = "", largura = Math.min(360, window.innerWidth - 28);
+  if (r) {
+    foco = '<div class="tour-foco" style="top:' + Math.round(r.top - pad) + "px;left:" + Math.round(r.left - pad) +
+      "px;width:" + Math.round(r.width + pad * 2) + "px;height:" + Math.round(r.height + pad * 2) + 'px"></div>';
+  } else {
+    foco = '<div class="tour-foco vazio"></div>';
+  }
+  var fim = Tour.i === Tour.passos.length - 1;
+  Tour.raiz.innerHTML = foco +
+    '<div class="tour-cd" style="width:' + largura + 'px">' +
+      '<div class="tour-h"><span class="tour-n">' + (Tour.i + 1) + " de " + Tour.passos.length + "</span>" +
+        '<button class="tour-x" onclick="fecharTour(false)" aria-label="Fechar">&#215;</button></div>' +
+      "<b>" + esc(p.t) + "</b><p>" + esc(p.d) + "</p>" +
+      '<div class="tour-pg">' + Tour.passos.map(function (x, i) {
+        return '<span class="' + (i === Tour.i ? "on" : "") + '"></span>';
+      }).join("") + "</div>" +
+      '<div class="tour-f">' +
+        '<button class="btn btn-s" onclick="fecharTour(false)">Sair</button>' +
+        (Tour.i ? '<button class="btn btn-s" onclick="passoAnterior()">Voltar</button>' : "") +
+        '<button class="btn btn-s btn-p" onclick="passoSeguinte()">' + (fim ? "Concluir" : "Continuar") + "</button>" +
+      "</div>" +
+    "</div>";
+  posicionarCartao(r, largura);
+}
+/* o cartão é medido depois de escrito e preso à janela — nunca sai da tela,
+   nem quando o alvo é alto (a barra lateral) ou está colado no rodapé */
+function posicionarCartao(r, largura) {
+  var cd = Tour.raiz.querySelector ? Tour.raiz.querySelector(".tour-cd") : null;
+  var alt = (cd && cd.offsetHeight) || 210, larg = (cd && cd.offsetWidth) || largura;
+  var vh = window.innerHeight, vw = window.innerWidth, g = 16, m = 12, topo, esq;
+  if (!r) {
+    topo = (vh - alt) / 2; esq = (vw - larg) / 2;
+  } else {
+    if (r.bottom + g + alt <= vh - m) topo = r.bottom + g;
+    else if (r.top - g - alt >= m) topo = r.top - g - alt;
+    else topo = r.top;
+    esq = r.left;
+    /* se o cartão precisou ficar na mesma faixa do alvo, joga para o lado livre */
+    if (topo < r.bottom && topo + alt > r.top) {
+      esq = (r.right + g + larg <= vw - m) ? r.right + g : r.left - g - larg;
+    }
+  }
+  topo = Math.max(m, Math.min(topo, vh - alt - m));
+  esq = Math.max(m, Math.min(esq, vw - larg - m));
+  Tour.pos = { top: Math.round(topo), left: Math.round(esq) };
+  if (cd) { cd.style.top = Tour.pos.top + "px"; cd.style.left = Tour.pos.left + "px"; }
+}
+/* boas-vindas: uma vez por pessoa, no primeiro acesso */
+function tourDeBoasVindas() {
+  if (!me() || tourVisto("inicio")) return;
+  setTimeout(function () { if (!Tour.chave) abrirTour("inicio"); }, 700);
+}
+
 (function () {
   if (!load()) seed();
   if (!DB.rede) DB.rede = { buscar_ativo: false, minimo_empresas: 3 };
@@ -5370,9 +6142,11 @@ function copiarCodigo() {
   if (restaurar()) iniciarApp();
   setInterval(function () {
     if (!Sess) return;
-    atualizaVencidas(); montarMenu(); montarSuporte(); atualizaFaturas();
+    pulso(); atualizaVencidas(); montarMenu(); montarSuporte(); atualizaFaturas();
+    if (View.pg === "supervisao") ir("supervisao");
   }, 60000);
 })();
+
 </script>
 </body>
 </html>

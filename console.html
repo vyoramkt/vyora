@@ -292,6 +292,31 @@ tr.clik:hover td{background:#fafbfc}
 .lic{display:flex;flex-direction:column;gap:5px;padding:13px 0;border-top:1px solid var(--line-2)}
 .lic-t{display:flex;justify-content:space-between;font-size:13px}
 .lic-t b{font-weight:640}
+
+/* ---------- leads do site ---------- */
+.ld-fun{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.seg-b{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 14px;
+  font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:.15s}
+.seg-b b{color:var(--brand);margin-left:4px}
+.seg-b:hover{border-color:var(--brand-line)}
+.seg-b.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.seg-b.on b{color:#fff}
+.ld{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);
+  padding:18px 20px;margin-bottom:12px}
+.ld-h{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.ld-h b{font-size:15px;font-weight:660}
+.ld-h .tag{margin-left:auto;flex:none}
+.ld-n{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:760px){.ld-n{grid-template-columns:repeat(2,1fr)}}
+.ld-n>div{display:flex;flex-direction:column}
+.ld-n span{font-size:11.5px;color:var(--ink-3)}
+.ld-n b{font-size:15px;font-weight:650}
+.ld-l{margin-top:12px;font-size:14px;font-weight:600;color:var(--brand)}
+.ld-o{margin-top:10px;padding-left:12px;border-left:2px solid var(--line);font-size:13px;
+  color:var(--ink-2);line-height:1.6}
+.ld-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;
+  border-top:1px solid var(--line-2)}
+.ld-f select{height:32px;border:1px solid var(--line);border-radius:9px;padding:0 8px;font-size:12.5px}
 </style>
 </head>
 <body>
@@ -984,6 +1009,7 @@ function contaVyora() {
 var MENU = [
   { k: "exec", n: "Dashboard executivo", i: "dashboard" },
   { k: "empresas", n: "Empresas", i: "empresa" },
+  { k: "leads", n: "Leads do site", i: "crescimento" },
   { k: "solicitacoes", n: "Solicitações", i: "suporte" },
   { k: "suporte", n: "Suporte", i: "suporte" },
   { k: "notificacoes", n: "Central de alertas", i: "alert" },
@@ -1005,6 +1031,7 @@ var GRUPOS = [
 var TITULOS = {
   exec: ["Dashboard executivo", "Como está a operação da Vyora neste momento"],
   empresas: ["Empresas", "Central de clientes da plataforma"],
+  leads: ["Leads do site", "Diagnósticos recebidos pelo site institucional"],
   solicitacoes: ["Solicitações", "Pedidos das empresas aguardando decisão da Vyora"],
   implantacoes: ["Implantações", "Do contrato assinado até a operação assistida"],
   sessoes: ["Acessos e sessões", "Quem está dentro da plataforma agora"],
@@ -1396,6 +1423,9 @@ function doLogin() {
   sucessoLogin(u);
   Store.set(CKEY, JSON.stringify(Sess));
   auditar("Login no console", u.nome, u.email);
+  /* mesma credencial do console abre os leads: se a conta existir no Supabase
+     com este e-mail e senha, conecta em silêncio e nunca mais pergunta */
+  if (!sessaoSupaGuardada()) conectarLeadsComLogin(mail, senha);
   err.classList.add("hidden");
   iniciar();
   if (u.trocar_senha) trocaObrigatoria();
@@ -3499,6 +3529,272 @@ function atualizarSituacoes() {
   });
   if (mudou) save();
 }
+/* =======================================================================
+   LEADS DO SITE — o diagnóstico do site institucional chega aqui
+
+   O site grava o lead no Supabase (só INSERT, pela chave pública).
+   O console LÊ com a sua conta: e-mail e senha do Supabase, token só na
+   memória desta aba. A chave service_role não existe neste arquivo.
+   ======================================================================= */
+var SUPA_TOKEN = null, SUPA_EXP = 0, SUPA_USER = "";
+var LEADS = { lista: [], carregando: false, erro: "", filtro: "", busca: "" };
+var FUNIL = [
+  ["novo", "Novo"], ["contato", "Em contato"], ["qualificado", "Qualificado"],
+  ["proposta", "Proposta"], ["ganho", "Ganho"], ["perdido", "Perdido"]
+];
+/* conexão já vem preenchida — são dados públicos (a chave publishable só
+   consegue INSERIR na tabela leads). O que continua sendo seu e nunca entra
+   no arquivo é o e-mail e a senha que leem os leads. */
+var SUPA_PADRAO = {
+  url: "https://nxvyvrbgkxysycnaeova.supabase.co",
+  key: "sb_publishable_d1acZQt5kyHr_bwfIfiRcA_jXGZWfUq"
+};
+function supaCfg() {
+  var g = DB.global || {};
+  var c = g.supabase || {};
+  return { url: c.url || SUPA_PADRAO.url, key: c.key || SUPA_PADRAO.key };
+}
+function supaConfigurado() {
+  var c = supaCfg();
+  return !!(c.url && c.key);
+}
+function salvarSupabase() {
+  DB.global.supabase = { url: String(v("sb-url")).trim().replace(/\/$/, ""), key: String(v("sb-key")).trim() };
+  auditar("Supabase configurado", "leads", DB.global.supabase.url);
+  save(); fecharModal(); toast("Conexão salva.", "ok"); ir("leads");
+}
+function supaAutenticado() { return !!SUPA_TOKEN && Date.now() < SUPA_EXP; }
+function supaSair() { SUPA_TOKEN = null; SUPA_EXP = 0; SUPA_USER = ""; esquecerSessaoSupa(); ir("leads"); }
+var SUPA_SESS = "vyora_supa_sess";
+/* guardar a sessão neste navegador é seguro: fica na máquina, não no arquivo
+   publicado. Senha nunca é gravada — o que fica é um token renovável. */
+function guardarSessaoSupa(j, mail) {
+  SUPA_TOKEN = j.access_token;
+  SUPA_EXP = Date.now() + (Number(j.expires_in || 3600) - 60) * 1000;
+  SUPA_USER = mail || SUPA_USER;
+  try {
+    Store.set(SUPA_SESS, JSON.stringify({ refresh: j.refresh_token, email: SUPA_USER }));
+  } catch (e) {}
+}
+function esquecerSessaoSupa() { try { Store.del(SUPA_SESS); } catch (e) {} }
+function sessaoSupaGuardada() {
+  try { return JSON.parse(Store.get(SUPA_SESS) || "null"); } catch (e) { return null; }
+}
+function supaEntrar() {
+  var c = supaCfg(), err = el("sb-err");
+  function bad(m) { if (err) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); } }
+  var mail = String(v("sb-mail")).trim(), senha = v("sb-pass");
+  if (!mail || !senha) return bad("Informe o e-mail e a senha da sua conta do Supabase.");
+  fetch(c.url + "/auth/v1/token?grant_type=password", {
+    method: "POST",
+    headers: { apikey: c.key, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: mail, password: senha })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) {
+      if (!x.ok || !x.j.access_token) return bad(x.j.error_description || x.j.msg || "Não foi possível entrar. Confira o e-mail e a senha.");
+      guardarSessaoSupa(x.j, mail);
+      ir("leads");
+    }).catch(function () { bad("Sem resposta do Supabase. Verifique a URL do projeto e a sua internet."); });
+}
+/* o login do console vale para os leads: mesma conta, mesma senha.
+   Falhou? Ninguém é incomodado — a tela de Leads oferece conectar depois. */
+function conectarLeadsComLogin(mail, senha) {
+  var c = supaCfg();
+  if (typeof fetch !== "function" || !c.url || !c.key || !mail || !senha) return;
+  fetch(c.url + "/auth/v1/token?grant_type=password", {
+    method: "POST",
+    headers: { apikey: c.key, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: String(mail).trim(), password: senha })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) { if (x.ok && x.j.access_token) guardarSessaoSupa(x.j, String(mail).trim()); })
+    .catch(function () {});
+}
+/* volta sozinha ao abrir o console, sem pedir nada */
+function religarSupabase(depois) {
+  var s = sessaoSupaGuardada(), c = supaCfg();
+  if (typeof fetch !== "function" || !s || !s.refresh) return depois(false);
+  fetch(c.url + "/auth/v1/token?grant_type=refresh_token", {
+    method: "POST",
+    headers: { apikey: c.key, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: s.refresh })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) {
+      if (!x.ok || !x.j.access_token) { esquecerSessaoSupa(); return depois(false); }
+      guardarSessaoSupa(x.j, s.email);
+      depois(true);
+    }).catch(function () { depois(false); });
+}
+function supaPedido(caminho, opcoes) {
+  var c = supaCfg();
+  var o = opcoes || {};
+  o.headers = Object.assign({
+    apikey: c.key, Authorization: "Bearer " + (SUPA_TOKEN || c.key), "Content-Type": "application/json"
+  }, o.headers || {});
+  return fetch(c.url + caminho, o);
+}
+function carregarLeads() {
+  if (!supaConfigurado() || !supaAutenticado()) return;
+  LEADS.carregando = true; LEADS.erro = "";
+  supaPedido("/rest/v1/leads?select=*&order=criado_em.desc&limit=300", { method: "GET" })
+    .then(function (r) {
+      if (r.status === 401 || r.status === 403) { SUPA_TOKEN = null; throw new Error("Sessão do Supabase expirou. Entre de novo."); }
+      if (!r.ok) throw new Error("O Supabase respondeu " + r.status + ". Confira se a tabela leads existe.");
+      return r.json();
+    })
+    .then(function (j) { LEADS.lista = j || []; LEADS.carregando = false; pintarLeads(); })
+    .catch(function (e) { LEADS.carregando = false; LEADS.erro = e.message || "Falha ao ler os leads."; pintarLeads(); });
+}
+function mudarStatusLead(id, novo) {
+  supaPedido("/rest/v1/leads?id=eq." + encodeURIComponent(id), {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ status: novo, atualizado_em: new Date().toISOString() })
+  }).then(function (r) {
+    if (!r.ok) return toast("Não foi possível atualizar o lead.", "err");
+    LEADS.lista.forEach(function (x) { if (x.id === id) x.status = novo; });
+    auditar("Lead do site atualizado", id, "status: " + novo);
+    save(); pintarLeads(); toast("Lead movido para " + novo + ".", "ok");
+  }).catch(function () { toast("Sem resposta do Supabase.", "err"); });
+}
+function leadParaEmpresa(id) {
+  var l = LEADS.lista.filter(function (x) { return x.id === id; })[0];
+  if (!l) return;
+  modalEmpresa();
+  setTimeout(function () {
+    if (el("em-nome")) el("em-nome").value = l.empresa || "";
+    if (el("em-seg")) el("em-seg").value = l.segmento || "";
+    if (el("em-mail")) el("em-mail").value = l.email || "";
+    if (el("em-tel")) el("em-tel").value = l.telefone || "";
+    if (el("em-func")) el("em-func").value = l.porte || "";
+  }, 0);
+}
+function contatoLead(id) {
+  var l = LEADS.lista.filter(function (x) { return x.id === id; })[0];
+  if (!l) return;
+  var tel = String(l.telefone || "").replace(/\D/g, "");
+  if (!tel) return toast("Este lead não deixou telefone — use o e-mail.", "err");
+  if (tel.length <= 11) tel = "55" + tel;
+  window.open("https://wa.me/" + tel + "?text=" + encodeURIComponent(
+    "Olá, " + (l.nome || "") + "! Aqui é da Vyora. Recebemos o seu Diagnóstico Estratégico" +
+    (l.empresa ? " da " + l.empresa : "") + " e queria conversar sobre o que apareceu nele."), "_blank");
+}
+function cardLead(l) {
+  var st = String(l.status || "novo");
+  var areas = Array.isArray(l.areas) ? l.areas.join(", ") : (l.areas || "");
+  var recs = Array.isArray(l.sugeridos) ? l.sugeridos.join(" + ") : (l.sugeridos || "");
+  return '<div class="ld">' +
+    '<div class="ld-h"><div><b>' + esc(l.empresa || "(sem empresa)") + "</b>" +
+    '<div class="sm mut">' + esc(l.nome || "") + (l.telefone ? " · " + esc(l.telefone) : "") +
+    (l.email ? " · " + esc(l.email) : "") + "</div></div>" +
+    '<span class="tag ' + (st === "ganho" ? "t-pos" : st === "perdido" ? "t-mut" : st === "novo" ? "t-inf" : "t-wr") + '">' +
+    esc((FUNIL.filter(function (f) { return f[0] === st; })[0] || ["", st])[1]) + "</span></div>" +
+    '<div class="ld-n">' +
+    "<div><span>Maturidade</span><b>" + (l.maturidade != null ? l.maturidade + "/10" : "—") + "</b></div>" +
+    "<div><span>Aderência</span><b>" + (l.aderencia != null ? l.aderencia + "%" : "—") + "</b></div>" +
+    "<div><span>Equipe</span><b>" + esc(l.porte || "—") + "</b></div>" +
+    "<div><span>Objetivo</span><b>" + esc(l.objetivo || "—") + "</b></div>" +
+    "</div>" +
+    (l.leitura ? '<p class="ld-l">' + esc(l.leitura) + "</p>" : "") +
+    '<div class="sm mut" style="margin-top:8px">' +
+    (l.desafio ? "Maior desafio: <b>" + esc(l.desafio) + "</b>. " : "") +
+    (areas ? "Áreas: " + esc(areas) + ". " : "") +
+    (recs ? "Sugerido: " + esc(recs) + "." : "") + "</div>" +
+    (l.observacao ? '<p class="ld-o">“' + esc(l.observacao) + '”</p>' : "") +
+    '<div class="ld-f"><select onchange="mudarStatusLead(\'' + esc(l.id) + '\',this.value)">' +
+    FUNIL.map(function (f) { return '<option value="' + f[0] + '"' + (st === f[0] ? " selected" : "") + ">" + f[1] + "</option>"; }).join("") +
+    "</select>" +
+    '<button class="btn btn-s" onclick="contatoLead(\'' + esc(l.id) + '\')">WhatsApp</button>' +
+    '<button class="btn btn-s btn-p" onclick="leadParaEmpresa(\'' + esc(l.id) + '\')">Virar empresa</button>' +
+    '<span class="sm mut" style="margin-left:auto">' + (l.criado_em ? fdt(l.criado_em) : "") +
+    (l.utm_source ? " · " + esc(l.utm_source) : "") + "</span></div>" +
+    "</div>";
+}
+function pintarLeads() {
+  var alvo = el("lead-lista");
+  if (!alvo) return;
+  if (LEADS.carregando) { alvo.innerHTML = '<div class="box"><div class="box-b sm mut">Buscando os diagnósticos…</div></div>'; return; }
+  if (LEADS.erro) {
+    alvo.innerHTML = '<div class="box"><div class="box-b">' + nota(esc(LEADS.erro), "ng") +
+      '<button class="btn" onclick="carregarLeads()">Tentar de novo</button></div></div>';
+    return;
+  }
+  var l = LEADS.lista.slice();
+  if (LEADS.filtro) l = l.filter(function (x) { return String(x.status || "novo") === LEADS.filtro; });
+  if (LEADS.busca) {
+    var t = LEADS.busca.toLowerCase();
+    l = l.filter(function (x) {
+      return ((x.empresa || "") + " " + (x.nome || "") + " " + (x.email || "") + " " + (x.telefone || "")).toLowerCase().indexOf(t) >= 0;
+    });
+  }
+  var cont = FUNIL.map(function (f) {
+    var n = LEADS.lista.filter(function (x) { return String(x.status || "novo") === f[0]; }).length;
+    return '<button class="seg-b' + (LEADS.filtro === f[0] ? " on" : "") + '" onclick="LEADS.filtro=\'' +
+      (LEADS.filtro === f[0] ? "" : f[0]) + '\';pintarLeads()">' + f[1] + " <b>" + n + "</b></button>";
+  }).join("");
+  alvo.innerHTML = '<div class="ld-fun">' + cont +
+    '<button class="seg-b' + (LEADS.filtro ? "" : " on") + '" onclick="LEADS.filtro=\'\';pintarLeads()">Todos <b>' +
+    LEADS.lista.length + "</b></button></div>" +
+    (l.length ? l.map(cardLead).join("")
+      : '<div class="box"><div class="box-b">' + vazio("Nenhum diagnóstico neste filtro",
+        "Quando alguém terminar o Diagnóstico Estratégico no site, ele aparece aqui em segundos.", "", "file") + "</div></div>");
+}
+function modalTrocarProjeto() {
+  var c = supaCfg();
+  modal("Projeto do Supabase",
+    nota("Só mexa aqui se você trocou de projeto. A chave <b>publishable</b> é pública; " +
+      "a chave secreta não deve ser usada em lugar nenhum.", "wr") +
+    '<div class="fld"><label>URL do projeto</label><input id="sb-url" value="' + esc(c.url) + '"></div>' +
+    '<div class="fld"><label>Chave publishable</label><input id="sb-key" value="' + esc(c.key) + '"></div>',
+    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
+    '<button class="btn btn-p" onclick="salvarSupabase()">Salvar</button>');
+}
+function pg_leads() {
+  var c = supaCfg();
+  if (!supaConfigurado()) {
+    return head("Leads do site", "Ligue o console ao seu projeto do Supabase") +
+      '<div class="box"><div class="box-b">' +
+      nota("O site institucional grava cada Diagnóstico Estratégico no Supabase. Para ler aqui, cole a " +
+        "<b>URL do projeto</b> e a <b>chave anon</b> (Supabase › Project Settings › API). " +
+        "A chave <b>service_role</b> não deve ser usada em lugar nenhum deste arquivo.", "wr") +
+      '<div class="fld"><label>URL do projeto</label><input id="sb-url" placeholder="https://xxxxxxxx.supabase.co" value="' + esc(c.url) + '"></div>' +
+      '<div class="fld"><label>Chave anon (pública)</label><input id="sb-key" placeholder="eyJhbGciOi..." value="' + esc(c.key) + '"></div>' +
+      '<button class="btn btn-p" onclick="salvarSupabase()">Salvar conexão</button>' +
+      "</div></div>";
+  }
+  if (!supaAutenticado()) {
+    /* se há sessão guardada neste computador, religa sozinho */
+    if (sessaoSupaGuardada()) {
+      setTimeout(function () {
+        religarSupabase(function (ok) {
+          if (ok) ir("leads");
+          else if (el("sb-religando")) el("sb-religando").hidden = true;
+        });
+      }, 0);
+    }
+    return head("Leads do site", "Entre com a sua conta do Supabase para ver os diagnósticos") +
+      (sessaoSupaGuardada() ? '<div class="box" id="sb-religando"><div class="box-b sm mut">Reconectando com a sua sessão salva…</div></div>' : "") +
+      '<div class="box" style="max-width:520px"><div class="box-b">' +
+      nota("Se a sua conta do Supabase usar <b>o mesmo e-mail e a mesma senha</b> do console, ele conecta " +
+        "sozinho no login e você nunca mais vê esta tela. Enquanto forem diferentes, entre uma vez aqui: " +
+        "a sessão fica guardada neste computador e se renova sozinha.<br><br>" +
+        "A senha não pode morar dentro do arquivo porque o console é publicado — quem abrisse o endereço " +
+        "leria os contatos dos seus leads.", "") +
+      '<div class="fld"><label>E-mail da conta Supabase</label><input id="sb-mail" autocomplete="username" value="' + esc(SUPA_USER) + '"></div>' +
+      '<div class="fld"><label>Senha</label><input id="sb-pass" type="password" autocomplete="current-password"></div>' +
+      '<div id="sb-err" class="note ng hidden"></div>' +
+      '<button class="btn btn-p" onclick="supaEntrar()">Entrar</button> ' +
+      '<button class="btn" onclick="modalTrocarProjeto()">Trocar projeto</button>' +
+      "</div></div>";
+  }
+  setTimeout(carregarLeads, 0);
+  var h = head("Leads do site", "Diagnósticos recebidos pelo site institucional",
+    '<div class="srch" style="min-width:220px"><span class="i">' + ICON.search +
+    '</span><input placeholder="Empresa, nome, telefone" oninput="LEADS.busca=this.value;pintarLeads()"></div>' +
+    '<button class="btn" onclick="carregarLeads()">Atualizar</button>' +
+    '<button class="btn" onclick="supaSair()">Sair do Supabase</button>');
+  h += '<div id="lead-lista"><div class="box"><div class="box-b sm mut">Buscando os diagnósticos…</div></div></div>';
+  return h;
+}
+
 (function () {
   if (!load()) seedConsole();
   migrar();

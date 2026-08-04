@@ -1651,8 +1651,7 @@ function renderLogin() {
     }
   }
   if (!DB.tenants.length) {
-    hint.innerHTML = "Informe o token da sua empresa. Se este computador for novo, o sistema traz o ambiente sozinho " +
-      "quando você entrar com o seu acesso. O token é criado pela Vyora na contratação da licença.";
+    hint.innerHTML = "Informe o token da sua empresa. O token é criado pela Vyora na contratação da licença.";
     hint.style.color = "var(--ink-3)";
   }
   mostrarEtapa("token");
@@ -5318,6 +5317,11 @@ function novaSenhaTemporaria(id) {
     u.trocar_senha = true; u.acesso = null; u.provisoria = nova;
     logar("Senha temporária gerada", u.nome);
     save(); modalCredencialUsuario(id);
+    /* e vale também no servidor, senão a pessoa não entra de outro aparelho */
+    redefinirSenhaNuvem(u.email, nova, function (ok, motivo) {
+      if (!ok) toast("A senha vale neste computador, mas não foi trocada no servidor" +
+        (motivo ? " (" + motivo + ")" : "") + ". A pessoa não vai conseguir entrar de outro aparelho.", "err");
+    });
   }, "Gerar");
 }
 function modalPerfil() {
@@ -5878,6 +5882,19 @@ function vincularPerfilNuvem(uid, email, papel, depois) {
     })
   }).then(function (r) { if (depois) depois(r.ok); })
     .catch(function () { if (depois) depois(false); });
+}
+/* redefinir a senha de OUTRA pessoa não é coisa que o navegador possa
+   fazer: quem faz é uma função que roda dentro do servidor e confere
+   se quem pediu tem esse direito. Aqui só pedimos. */
+function redefinirSenhaNuvem(email, senha, depois) {
+  if (!podeNuvem() || !nuvemViva() || !email || !senha) return depois && depois(false, "sem conexão com o servidor");
+  fetch(SUPA_URL + "/functions/v1/redefinir-senha", {
+    method: "POST",
+    headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SYNC.token, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: String(email).toLowerCase(), senha: senha })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) { if (depois) depois(!!(x.ok && x.j && x.j.ok), x.j && x.j.erro); })
+    .catch(function () { if (depois) depois(false, "sem resposta do servidor"); });
 }
 /* trocar a senha aqui troca também na nuvem — nada fica desencontrado */
 function trocarSenhaNuvem(nova, depois) {

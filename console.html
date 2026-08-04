@@ -2389,6 +2389,12 @@ function resetarSenha(uid2) {
   if (t && u.perfil === "admin") t.senha_provisoria = nova;
   auditar("Senha redefinida", u.nome, u.email + " · senha temporária entregue", u.tenant_id);
   save(); fecharModal();
+  /* a senha só serve de verdade se valer no servidor também */
+  redefinirSenhaNuvemConsole(u.email, nova, function (ok, motivo) {
+    if (ok) return toast("Senha redefinida aqui e no servidor.", "ok");
+    toast("A senha mudou no console, mas NÃO no servidor" + (motivo ? " (" + motivo + ")" : "") +
+      ". A pessoa não vai conseguir entrar de outro computador com ela.", "err");
+  });
   modalCredencialUsuario(uid2);
   if (View.p && View.p.id) verEmpresa(View.p.id, "usuarios");
 }
@@ -4174,6 +4180,20 @@ function publicarMapaDaRede() {
 /* ---------------- acesso na nuvem criado sozinho ----------------
    Ao provisionar a empresa, a conta de acesso do administrador dela
    nasce no Supabase junto com o ambiente. Você não abre o painel. */
+/* pedir ao servidor que troque a senha de alguém. A permissão é
+   conferida lá dentro: a Vyora alcança qualquer pessoa, o admin de
+   uma empresa só alcança a equipe dele. */
+function redefinirSenhaNuvemConsole(email, senha, depois) {
+  var c = supaCfg();
+  if (typeof fetch !== "function" || !c.url || !supaAutenticado()) return depois && depois(false, "console desconectado do servidor");
+  fetch(c.url + "/functions/v1/redefinir-senha", {
+    method: "POST",
+    headers: { apikey: c.key, Authorization: "Bearer " + SUPA_TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: String(email).toLowerCase(), senha: senha })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) { if (depois) depois(!!(x.ok && x.j && x.j.ok), x.j && x.j.erro); })
+    .catch(function () { if (depois) depois(false, "sem resposta do servidor"); });
+}
 var senhaNaoTrocou = "";
 function criarContaNuvemConsole(email, senha, tenantId, papel, nome, depois) {
   var c = supaCfg();
@@ -4192,13 +4212,16 @@ function criarContaNuvemConsole(email, senha, tenantId, papel, nome, depois) {
         return fim(false, "Não foi possível criar o acesso de " + email + " na nuvem: " + m);
       }
       /* o servidor responde igual para conta nova e conta que já existe —
-         a diferença é a lista de identidades vazia. Nesse caso a senha NÃO
-         muda, e dizer que deu tudo certo seria mentira. */
+         a diferença é a lista de identidades vazia. Quando já existe, criar
+         não muda a senha: quem muda é a função do servidor. */
       var ident = (x.j.user && x.j.user.identities) || x.j.identities;
       if (Array.isArray(ident) && ident.length === 0) {
-        senhaNaoTrocou = email;
-        toast("O acesso de " + email + " já existia na nuvem com outra senha. " +
-          "A senha temporária nova NÃO vale para ele — veja o aviso na tela.", "err");
+        redefinirSenhaNuvemConsole(email, senha, function (deu, motivo) {
+          if (deu) return;
+          senhaNaoTrocou = email;
+          toast("O acesso de " + email + " já existia com outra senha e não consegui trocá-la" +
+            (motivo ? " (" + motivo + ")" : "") + ". Veja o aviso na tela.", "err");
+        });
       }
       supaPedido("/rest/v1/perfis", {
         method: "POST",
@@ -4302,13 +4325,12 @@ function pg_acessos() {
     "servidor, não o arquivo. Suspender um acesso aqui corta o alcance <b>na hora</b>, em qualquer aparelho.", "");
   if (senhaNaoTrocou) {
     h += '<div style="height:14px"></div>' +
-      nota("<b>Atenção: a senha de " + esc(senhaNaoTrocou) + " não foi trocada.</b><br>" +
-        "A conta dessa pessoa já existia no servidor, e por segurança o servidor não deixa ninguém " +
-        "redefinir a senha de outro por aqui — nem a Vyora. Gerar uma senha temporária nova no console " +
-        "muda só o lado de cá; do lado do servidor continua valendo a senha antiga.<br><br>" +
-        "<b>Para resolver:</b> abra o Supabase em <b>Authentication › Users</b>, apague esse usuário, " +
-        "volte aqui e clique em <b>Criar os acessos que faltam</b>. A conta nasce de novo com a senha " +
-        "temporária que está no console.", "wr");
+      nota("<b>Atenção: a senha de " + esc(senhaNaoTrocou) + " não foi trocada no servidor.</b><br>" +
+        "A conta dessa pessoa já existia lá com outra senha. Trocar a senha de alguém exige a função " +
+        "<b>redefinir-senha</b> no Supabase — se ela ainda não foi publicada, é isso que está faltando " +
+        "(Edge Functions no painel).<br><br>" +
+        "<b>Alternativa manual:</b> Supabase › <b>Authentication › Users</b>, apague esse usuário, volte " +
+        "aqui e clique em <b>Criar os acessos que faltam</b>.", "wr");
   }
   h += '<div style="height:14px"></div>' +
     box("Mapa da rede no servidor", '<div class="box-b">' +

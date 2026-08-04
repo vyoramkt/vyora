@@ -2494,8 +2494,30 @@ function excluirEmpresa(id) {
       DB[c] = (DB[c] || []).filter(function (x) { return x.tenant_id !== id; });
     });
   DB.tenants = DB.tenants.filter(function (x) { return x.id !== id; });
+  /* a decisão fica registrada: nada que venha da nuvem recria esta
+     empresa, nem aqui nem no sistema, que divide este mesmo banco */
+  DB.removidos = DB.removidos || [];
+  if (DB.removidos.indexOf(id) < 0) DB.removidos.push(id);
+  /* e o que estiver no servidor sai junto */
+  limparEmpresaNaNuvem(id, nome);
   auditar("Empresa excluída", nome, regs + " registro(s) removidos", null, "ativa", "excluída");
   save(); fecharModal(); toast(nome + " foi excluída.", "ok"); ir("empresas");
+}
+/* tira do servidor o que sustentava a empresa: o ambiente (que abriria
+   um computador novo), o acesso das pessoas e o lugar dela no mapa da
+   rede. Se a internet falhar, o que já foi apagado aqui continua
+   apagado — a lista de removidas garante isso. */
+function limparEmpresaNaNuvem(id, nome) {
+  if (!supaConfigurado() || !supaAutenticado()) return;
+  supaPedido("/rest/v1/rpc/apagar_dados_da_empresa", {
+    method: "POST", body: JSON.stringify({ empresa: id })
+  }).then(function (r) {
+    if (!r.ok) return toast("A empresa saiu daqui, mas o servidor recusou a limpeza (" + r.status + "). Ela não volta para esta tela.", "err");
+    auditar("Dados apagados no servidor", nome || id, "ambiente, acessos e operação");
+    save();
+  }).catch(function () {
+    toast("A empresa saiu daqui. Sem resposta do servidor agora — tente a limpeza de novo mais tarde.", "err");
+  });
 }
 /* =======================================================================
    SOLICITAÇÕES — tudo que a empresa pede passa por aqui
@@ -4231,6 +4253,7 @@ function pg_acessos() {
 
 (function () {
   if (!load()) seedConsole();
+  if (!Array.isArray(DB.removidos)) DB.removidos = [];
   migrar();
   migrarSenhas();
   var trocados = renovarTokensVencidos();

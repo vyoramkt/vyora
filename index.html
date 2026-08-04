@@ -1549,6 +1549,7 @@ function slaStatus(t) {
 }
 function growthCfg() {
   if (!DB.rede) DB.rede = { buscar_ativo: false, minimo_empresas: 3 };
+  if (!Array.isArray(DB.removidos)) DB.removidos = [];
   if (!DB.rede.growth) DB.rede.growth = {};
   /* corrige contato de exemplo gravado por qualquer versão anterior dos dois arquivos */
   if (corrigirContato(DB.rede.growth)) save();
@@ -5745,6 +5746,20 @@ function enviarPendentes(depois) {
   proxima();
 }
 
+/* ---------------- empresa apagada não volta ----------------
+   Excluir uma empresa é uma decisão, não um acidente de sincronização.
+   O id dela fica anotado aqui, e nada que venha da nuvem — registro,
+   ambiente ou número — recria essa empresa nesta máquina. */
+function empresaRemovida(id) { return !!id && (DB.removidos || []).indexOf(id) >= 0; }
+function esquecerEmpresa(id) {
+  if (!id) return;
+  DB.removidos = DB.removidos || [];
+  if (DB.removidos.indexOf(id) < 0) DB.removidos.push(id);
+}
+function lembrarEmpresa(id) {
+  DB.removidos = (DB.removidos || []).filter(function (x) { return x !== id; });
+}
+
 /* ---------------- o que mudou lá ---------------- */
 function aplicarRemoto(col, linhas) {
   var esp = espelho(), rel = relogio(), mudou = false;
@@ -5752,6 +5767,8 @@ function aplicarRemoto(col, linhas) {
   DB[col] = DB[col] || [];
   linhas.forEach(function (linha) {
     if (linha.atualizado_em && (!rel[col] || linha.atualizado_em > rel[col])) rel[col] = linha.atualizado_em;
+    /* empresa apagada aqui: o relógio anda, o registro não entra */
+    if (empresaRemovida(linha.tenant_id)) return;
     var pos = -1;
     for (var k = 0; k < DB[col].length; k++) if (DB[col][k].id === linha.id) { pos = k; break; }
     if (linha.excluido) {
@@ -6590,6 +6607,7 @@ function pedirMesesRede() {
 function espelharEmpresasRede(linhas) {
   var mudou = false;
   (linhas || []).forEach(function (x) {
+    if (empresaRemovida(x.tenant_id)) return;
     var t = find(DB.tenants, x.tenant_id);
     if (!t) {
       DB.tenants.push({
@@ -6700,6 +6718,7 @@ function publicarAmbiente(depois) {
 /* instala o pacote sem encostar em senha nenhuma que já exista aqui */
 function instalarAmbiente(p) {
   if (!p || !p.tenant) return false;
+  if (empresaRemovida(p.tenant.id)) return false;
   var t = find(DB.tenants, p.tenant.id);
   if (t) { for (var k in p.tenant) if (p.tenant.hasOwnProperty(k)) t[k] = p.tenant[k]; }
   else DB.tenants.push(p.tenant);
@@ -6951,6 +6970,7 @@ cuidarDoAmbiente = function () {
 (function () {
   if (!load()) seed();
   if (!DB.rede) DB.rede = { buscar_ativo: false, minimo_empresas: 3 };
+  if (!Array.isArray(DB.removidos)) DB.removidos = [];
   ["tenants", "config", "users", "customers", "products", "moves", "sales", "parcels", "cash", "metas",
     "cobrancas", "acordos", "leads", "faturas", "tickets", "growth", "logs", "planos", "solicitacoes",
     "implantacoes", "contratos", "sessoes", "despesas"].forEach(function (c) { if (!Array.isArray(DB[c])) DB[c] = []; });

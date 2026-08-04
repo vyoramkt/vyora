@@ -430,6 +430,19 @@ tr.clik:hover td{background:#fafbfc}
 .imp{position:fixed;left:0;right:0;bottom:0;z-index:80;background:var(--alert);color:#3a2a00;display:flex;gap:14px;
   align-items:center;justify-content:center;padding:11px 16px;font-size:12.5px;font-weight:600;box-shadow:0 -6px 20px rgba(0,0,0,.14)}
 
+/* ---------- sincronização ---------- */
+.sync{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);
+  border-radius:999px;padding:6px 13px;font-size:11.5px;font-weight:600;color:var(--ink-2);cursor:pointer;
+  white-space:nowrap;transition:.15s}
+.sync:hover{border-color:var(--brand-line)}
+.sync-p{width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
+.sync.pos .sync-p{background:var(--grow)}
+.sync.inf .sync-p{background:var(--brand);animation:syncPulsa 1.4s ease-in-out infinite}
+.sync.wr{color:var(--alert);border-color:var(--alert)}
+.sync.wr .sync-p{background:var(--alert)}
+@keyframes syncPulsa{0%,100%{opacity:.4}50%{opacity:1}}
+@media(max-width:900px){.sync{display:none}}
+
 /* ---------- histórico mensal ---------- */
 .hbars{display:flex;align-items:flex-end;gap:clamp(6px,1.4vw,16px);height:190px}
 .hb{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0}
@@ -520,6 +533,11 @@ body.tour-on{overflow:hidden}
         <button class="btn btn-p btn-lg" onclick="validarToken()" id="tk-btn">Continuar</button>
       </div>
       <div class="tk-hint" id="tk-hint">Formato: VY seguido de 8 caracteres.</div>
+      <div class="tk-hint" style="margin-top:16px">Primeiro acesso neste computador?
+        <button type="button" onclick="modalPrimeiroAcesso()"
+                style="background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--brand);cursor:pointer;text-decoration:underline">
+          Baixar o meu ambiente</button>
+      </div>
     </div>
 
     <!-- etapa 2: quem está usando -->
@@ -576,6 +594,7 @@ body.tour-on{overflow:hidden}
         <div class="sub" id="bar-s"></div>
       </div>
       <div class="bar-r">
+        <button class="sync mut" id="sync-chip" onclick="modalSync()" title="Sincronização"><span class="sync-p"></span>Só neste computador</button>
         <div class="gsearch">
           <span class="i"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></span>
           <input id="gq" placeholder="Buscar clientes, vendas ou produtos" autocomplete="off"
@@ -1633,7 +1652,8 @@ function renderLogin() {
     }
   }
   if (!DB.tenants.length) {
-    hint.innerHTML = "Nenhum ambiente foi liberado neste navegador ainda. O acesso é criado pela Vyora na contratação da licença.";
+    hint.innerHTML = "Nenhum ambiente foi liberado neste computador ainda. Se você já usa o sistema, baixe o seu ambiente no link abaixo. " +
+      "Se ainda não tem acesso, ele é criado pela Vyora na contratação da licença.";
     hint.style.color = "var(--ink-3)";
   }
   mostrarEtapa("token");
@@ -1717,17 +1737,32 @@ function doLogin() {
   if (falta) return bad("Acesso bloqueado por tentativas erradas. Tente de novo em " + falta + " minuto(s).");
   if (u.status !== "ativo") return bad("Usuário inativo. Procure o administrador da empresa.");
   if (!conferirSenha(u, pass)) {
-    var bl = falhaLogin(u);
-    logarAcesso("Tentativa de acesso negada", u.nome + " · " + u.email, u.tenant_id, u.id);
-    return bad(bl ? "Muitas tentativas erradas. Acesso bloqueado por " + bl + " minuto(s)."
-      : "E-mail ou senha inválidos para este ambiente. Restam " + (MAX_TENTATIVAS - (u.tentativas || 0)) + " tentativa(s).");
+    /* pode ser a senha nova, trocada em outro aparelho, ou um ambiente
+       recém-baixado: a nuvem é quem tem a palavra final */
+    return senhaPelaNuvem(u, pass,
+      function () { err.classList.add("hidden"); entrarComUsuario(u, mail, pass); },
+      function () {
+        var bl = falhaLogin(u);
+        logarAcesso("Tentativa de acesso negada", u.nome + " · " + u.email, u.tenant_id, u.id);
+        bad(bl ? "Muitas tentativas erradas. Acesso bloqueado por " + bl + " minuto(s)."
+          : "E-mail ou senha inválidos para este ambiente. Restam " + (MAX_TENTATIVAS - (u.tentativas || 0)) + " tentativa(s).");
+      });
   }
   err.classList.add("hidden");
+  entrarComUsuario(u, mail, pass);
+}
+function entrarComUsuario(u, mail, pass) {
   sucessoLogin(u);
   Sess = marcarSessao({ tenant_id: u.tenant_id, user_id: u.id });
   Store.set(SKEY, JSON.stringify(Sess));
   logar("Acesso ao sistema", u.nome);
   save(); iniciarApp();
+  /* mesma credencial abre a nuvem: sincroniza sem pedir nada a mais */
+  if (!nuvemSessao()) {
+    conectarNuvem(mail, pass, function (ok) { if (!ok) alinharSenhaNuvem(mail, pass); });
+  } else {
+    religarNuvem(function (ok) { if (!ok) alinharSenhaNuvem(mail, pass); });
+  }
   if (u.trocar_senha) trocaObrigatoria();
 }
 function trocaObrigatoria() {
@@ -1745,12 +1780,17 @@ function salvarTrocaObrigatoria() {
   var msg = senhaFraca(v("ts-a"), u.nome, u.email);
   if (msg) return bad(msg);
   if (v("ts-a") !== v("ts-b")) return bad("A confirmação não confere.");
-  protegerSenha(u, v("ts-a"));
+  var nova = v("ts-a");
+  protegerSenha(u, nova);
   u.trocar_senha = false;
   logar("Senha definida no primeiro acesso", u.nome);
+  /* a nuvem acompanha a mesma senha — sincronização não fica para trás */
+  if (nuvemViva()) trocarSenhaNuvem(nova);
+  else criarContaNuvem(u.email, nova, u.perfil, function (ok) { if (ok) conectarNuvem(u.email, nova); });
   save(); fecharModal(); toast("Senha definida. Bom trabalho.", "ok");
 }
 function sair() {
+  nuvemEsquecer();
   Store.del(SKEY); Sess = null;
   el("app").style.display = "none"; el("login").classList.remove("hidden");
   el("lg-pass").value = ""; fecharDrawer(true); fecharModal();
@@ -1781,6 +1821,9 @@ function iniciarApp() {
   aplicarMarca(); montarMenu(); montarUsuario(); montarSuporte(); avisoSuporteVyora();
   ir(isVend() ? "pdv" : "dashboard");
   pulso();
+  contarFila(); pintarSync();
+  if (nuvemSessao()) religarNuvem(function () {});
+  lacoSync();
   tourDeBoasVindas();
 }
 /* transparência: se a Vyora estiver dentro do ambiente, a empresa vê */
@@ -4889,7 +4932,8 @@ function pg_config(p) {
     ["equipe", "Equipe", "users", "Quem participa da operação"],
     ["sistema", "Sistema", "config", "Regras do negócio e preferências"],
     ["historico", "Histórico mensal", "relatorios", "Como cada mês fechou, um ao lado do outro"],
-    ["seguranca", "Segurança", "seguranca", "Acessos, atividade e dados"]
+    ["seguranca", "Segurança", "seguranca", "Acessos, atividade e dados"],
+    ["copias", "Cópias e registro", "seguranca", "O que sobra se algo der errado"]
   ];
   var h = head("Configurações", "Central de configuração de " + t.nome,
     '<button class="btn" onclick="ir(\'assinatura\')">' + ICON.fatura + "Licença e manutenção</button>");
@@ -5022,6 +5066,10 @@ function pg_config(p) {
 
   if (tab === "historico") {
     h += corpoHistorico();
+  }
+
+  if (tab === "copias") {
+    h += corpoCopias();
   }
 
   if (tab === "seguranca") {
@@ -5191,7 +5239,10 @@ function salvarUsuario(id) {
     if (u.perfil === "admin" && v("u-perfil") !== "admin" && DB.users.filter(function (x) { return x.tenant_id === T() && x.perfil === "admin" && x.status === "ativo"; }).length < 2)
       return bad("A empresa precisa de pelo menos um administrador ativo.");
     u.nome = nome; u.email = mail; u.cargo = v("u-cargo"); u.tel = v("u-tel"); u.perfil = v("u-perfil");
-    if (v("u-senha")) { protegerSenha(u, v("u-senha")); u.trocar_senha = true; }
+    if (v("u-senha")) {
+      protegerSenha(u, v("u-senha")); u.trocar_senha = true;
+      criarContaNuvem(mail, v("u-senha"), u.perfil);
+    }
     logar("Usuário atualizado", nome); toast("Usuário atualizado.", "ok");
   } else {
     var campoNovo = v("u-perfil") === "admin" ? "admins" : "pdvs";
@@ -5202,6 +5253,8 @@ function salvarUsuario(id) {
     novoU.provisoria = provisoria;
     DB.users.push(novoU);
     logar("Usuário criado", nome);
+    /* o acesso na nuvem nasce junto: ninguém precisa abrir o Supabase */
+    criarContaNuvem(mail, provisoria, novoU.perfil);
     save(); fecharModal();
     modalCredencialUsuario(novoU.id);
     return;
@@ -5500,6 +5553,342 @@ function copiarCodigo() {
 /* =======================================================================
    INÍCIO
    ======================================================================= */
+
+/* =======================================================================
+   SINCRONIZAÇÃO — o mesmo dado em todos os aparelhos
+
+   Como funciona, em três frases:
+   · a tela continua lendo do navegador, então nada fica lento;
+   · o que muda aqui sobe para o Supabase em segundos, registro a registro;
+   · o que os outros mudaram desce sozinho e aparece sem recarregar.
+
+   Sem internet, o sistema trabalha igual: a fila espera e sobe depois.
+   Quem decide o que cada um alcança é o servidor (RLS), não este arquivo.
+   ======================================================================= */
+var SUPA_URL = "https://nxvyvrbgkxysycnaeova.supabase.co";
+var SUPA_KEY = "sb_publishable_d1acZQt5kyHr_bwfIfiRcA_jXGZWfUq";
+
+/* coleção do sistema → tabela no Supabase */
+var TABELAS = {
+  customers: "customers", products: "products", moves: "moves",
+  sales: "sales", parcels: "parcels", cash: "cash", metas: "metas",
+  cobrancas: "cobrancas", acordos: "acordos", leads: "leads_empresa", logs: "logs"
+};
+var SYNC = {
+  ligado: false, estado: "desligado", erro: "",
+  token: null, exp: 0, email: "", tenant: "", perfil: "",
+  fila: 0, enviando: false, baixando: false, ultima: null, timer: null
+};
+var K_ESPELHO = "vyora_sync_espelho", K_RELOGIO = "vyora_sync_relogio", K_SESS_NUVEM = "vyora_nuvem";
+
+function espelho() { try { return JSON.parse(Store.get(K_ESPELHO) || "{}"); } catch (e) { return {}; } }
+function gravarEspelho(e) { Store.set(K_ESPELHO, JSON.stringify(e)); }
+function relogio() { try { return JSON.parse(Store.get(K_RELOGIO) || "{}"); } catch (e) { return {}; } }
+function gravarRelogio(r) { Store.set(K_RELOGIO, JSON.stringify(r)); }
+function assinatura(o) { return JSON.stringify(o); }
+
+/* ---------------- sessão na nuvem ---------------- */
+function nuvemGuardar(j, mail) {
+  SYNC.token = j.access_token;
+  SYNC.exp = Date.now() + (Number(j.expires_in || 3600) - 60) * 1000;
+  SYNC.email = mail || SYNC.email;
+  try { Store.set(K_SESS_NUVEM, JSON.stringify({ refresh: j.refresh_token, email: SYNC.email })); } catch (e) {}
+}
+function nuvemEsquecer() {
+  SYNC.token = null; SYNC.exp = 0; SYNC.ligado = false; SYNC.estado = "desligado";
+  try { Store.del(K_SESS_NUVEM); } catch (e) {}
+}
+function nuvemSessao() { try { return JSON.parse(Store.get(K_SESS_NUVEM) || "null"); } catch (e) { return null; } }
+function nuvemViva() { return !!SYNC.token && Date.now() < SYNC.exp; }
+function podeNuvem() { return typeof fetch === "function" && !!SUPA_URL && !!SUPA_KEY; }
+
+/* entra na nuvem com o mesmo e-mail e senha do sistema */
+function conectarNuvem(mail, senha, depois) {
+  if (!podeNuvem() || !mail || !senha) return depois && depois(false);
+  fetch(SUPA_URL + "/auth/v1/token?grant_type=password", {
+    method: "POST", headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: String(mail).trim(), password: senha })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) {
+      if (!x.ok || !x.j.access_token) { SYNC.estado = "sem-conta"; return depois && depois(false); }
+      nuvemGuardar(x.j, mail);
+      confirmarPerfilNuvem(depois);
+    }).catch(function () { SYNC.estado = "offline"; if (depois) depois(false); });
+}
+function religarNuvem(depois) {
+  var s = nuvemSessao();
+  if (!podeNuvem() || !s || !s.refresh) return depois && depois(false);
+  fetch(SUPA_URL + "/auth/v1/token?grant_type=refresh_token", {
+    method: "POST", headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: s.refresh })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) {
+      if (!x.ok || !x.j.access_token) { nuvemEsquecer(); return depois && depois(false); }
+      nuvemGuardar(x.j, s.email);
+      confirmarPerfilNuvem(depois);
+    }).catch(function () { SYNC.estado = "offline"; if (depois) depois(false); });
+}
+/* o servidor diz de qual empresa a pessoa é — o arquivo não escolhe */
+function confirmarPerfilNuvem(depois) {
+  nuvemPedido("/rest/v1/perfis?select=tenant_id,perfil,ativo", { method: "GET" })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (l) {
+      var p = (l || [])[0];
+      if (!p || !p.ativo) { SYNC.ligado = false; SYNC.estado = "sem-perfil"; return depois && depois(false); }
+      SYNC.tenant = p.tenant_id; SYNC.perfil = p.perfil;
+      SYNC.ligado = true; SYNC.estado = "ligado";
+      pintarSync();
+      sincronizar();
+      if (depois) depois(true);
+    }).catch(function () { SYNC.estado = "offline"; if (depois) depois(false); });
+}
+function nuvemPedido(caminho, opcoes) {
+  var o = opcoes || {};
+  o.headers = Object.assign({
+    apikey: SUPA_KEY, Authorization: "Bearer " + (SYNC.token || SUPA_KEY),
+    "Content-Type": "application/json"
+  }, o.headers || {});
+  return fetch(SUPA_URL + caminho, o);
+}
+
+/* ---------------- o que mudou aqui ---------------- */
+function pendentes() {
+  var esp = espelho(), lote = {};
+  for (var col in TABELAS) {
+    if (!TABELAS.hasOwnProperty(col)) continue;
+    var atuais = (DB[col] || []).filter(function (x) { return x.tenant_id === T(); });
+    var anterior = esp[col] || {}, agora = {}, envios = [];
+    atuais.forEach(function (r) {
+      var a = assinatura(r);
+      agora[r.id] = a;
+      if (anterior[r.id] !== a) {
+        envios.push({ id: r.id, tenant_id: r.tenant_id, dados: r, excluido: false });
+      }
+    });
+    for (var id in anterior) {
+      if (anterior.hasOwnProperty(id) && !agora[id]) {
+        envios.push({ id: id, tenant_id: T(), dados: { id: id }, excluido: true });
+      }
+    }
+    if (envios.length) lote[col] = envios;
+  }
+  return lote;
+}
+function contarFila() {
+  var l = pendentes(), n = 0;
+  for (var c in l) if (l.hasOwnProperty(c)) n += l[c].length;
+  SYNC.fila = n;
+  return n;
+}
+function enviarPendentes(depois) {
+  if (!SYNC.ligado || !nuvemViva() || SYNC.enviando) return depois && depois();
+  var lote = pendentes(), cols = Object.keys(lote);
+  if (!cols.length) { SYNC.fila = 0; return depois && depois(); }
+  SYNC.enviando = true; SYNC.estado = "enviando"; pintarSync();
+  var esp = espelho(), i = 0;
+  function proxima() {
+    if (i >= cols.length) {
+      gravarEspelho(esp);
+      SYNC.enviando = false; SYNC.estado = "ligado"; SYNC.ultima = new Date().toISOString();
+      contarFila(); pintarSync();
+      return depois && depois();
+    }
+    var col = cols[i++], linhas = lote[col];
+    nuvemPedido("/rest/v1/" + TABELAS[col], {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(linhas)
+    }).then(function (r) {
+      if (r.ok) {
+        esp[col] = esp[col] || {};
+        linhas.forEach(function (x) {
+          if (x.excluido) delete esp[col][x.id];
+          else esp[col][x.id] = assinatura(x.dados);
+        });
+      } else if (r.status === 401 || r.status === 403) {
+        SYNC.token = null; SYNC.estado = "expirada";
+      } else {
+        SYNC.erro = "O servidor recusou o envio (" + r.status + ").";
+        SYNC.estado = "erro";
+      }
+      proxima();
+    }).catch(function () { SYNC.enviando = false; SYNC.estado = "offline"; pintarSync(); if (depois) depois(); });
+  }
+  proxima();
+}
+
+/* ---------------- o que mudou lá ---------------- */
+function aplicarRemoto(col, linhas) {
+  var esp = espelho(), rel = relogio(), mudou = false;
+  esp[col] = esp[col] || {};
+  DB[col] = DB[col] || [];
+  linhas.forEach(function (linha) {
+    if (linha.atualizado_em && (!rel[col] || linha.atualizado_em > rel[col])) rel[col] = linha.atualizado_em;
+    var pos = -1;
+    for (var k = 0; k < DB[col].length; k++) if (DB[col][k].id === linha.id) { pos = k; break; }
+    if (linha.excluido) {
+      if (pos >= 0) { DB[col].splice(pos, 1); mudou = true; }
+      delete esp[col][linha.id];
+      return;
+    }
+    var vindo = linha.dados || {};
+    vindo.id = linha.id; vindo.tenant_id = linha.tenant_id;
+    var a = assinatura(vindo);
+    if (pos >= 0) {
+      if (assinatura(DB[col][pos]) !== a) { DB[col][pos] = vindo; mudou = true; }
+    } else { DB[col].push(vindo); mudou = true; }
+    esp[col][linha.id] = a;
+  });
+  gravarEspelho(esp); gravarRelogio(rel);
+  return mudou;
+}
+function baixarNovidades(depois) {
+  if (!SYNC.ligado || !nuvemViva() || SYNC.baixando) return depois && depois(false);
+  var cols = Object.keys(TABELAS), rel = relogio(), i = 0, mudou = false;
+  SYNC.baixando = true;
+  function proxima() {
+    if (i >= cols.length) {
+      SYNC.baixando = false; SYNC.ultima = new Date().toISOString();
+      if (mudou) { save(); if (typeof View !== "undefined" && View.pg) ir(View.pg, View.p); }
+      pintarSync();
+      return depois && depois(mudou);
+    }
+    var col = cols[i++];
+    var desde = rel[col] || "1970-01-01T00:00:00Z";
+    nuvemPedido("/rest/v1/" + TABELAS[col] + "?select=*&atualizado_em=gt." +
+      encodeURIComponent(desde) + "&order=atualizado_em.asc&limit=500", { method: "GET" })
+      .then(function (r) {
+        if (r.status === 401 || r.status === 403) { SYNC.token = null; SYNC.estado = "expirada"; return []; }
+        return r.ok ? r.json() : [];
+      })
+      .then(function (l) {
+        if (l && l.length && aplicarRemoto(col, l)) mudou = true;
+        proxima();
+      })
+      .catch(function () { SYNC.baixando = false; SYNC.estado = "offline"; pintarSync(); if (depois) depois(mudou); });
+  }
+  proxima();
+}
+function sincronizar(depois) {
+  if (!SYNC.ligado) return depois && depois();
+  enviarPendentes(function () { baixarNovidades(function () { if (depois) depois(); }); });
+}
+
+/* ---------------- ritmo ---------------- */
+var SYNC_ATIVO = 6000, SYNC_OCIOSO = 25000, _syncMexeu = Date.now();
+function marcarAtividade() { _syncMexeu = Date.now(); }
+function ritmoSync() { return (Date.now() - _syncMexeu) < 120000 ? SYNC_ATIVO : SYNC_OCIOSO; }
+function lacoSync() {
+  if (SYNC.timer) clearTimeout(SYNC.timer);
+  SYNC.timer = setTimeout(function () {
+    if (SYNC.ligado && !nuvemViva()) religarNuvem(function () {});
+    else sincronizar();
+    lacoSync();
+  }, ritmoSync());
+}
+/* toda gravação local agenda uma subida — sem travar a tela */
+var _saveLocal = save, _syncAgendado = null;
+save = function () {
+  _saveLocal();
+  marcarAtividade();
+  contarFila(); pintarSync();
+  if (!SYNC.ligado) return;
+  if (_syncAgendado) clearTimeout(_syncAgendado);
+  _syncAgendado = setTimeout(function () { enviarPendentes(); }, 1500);
+};
+
+/* ---------------- acesso na nuvem criado sozinho ----------------
+   Quando alguém ganha login no sistema, a conta na nuvem nasce junto:
+   mesma pessoa, mesmo e-mail, mesma senha. Ninguém precisa abrir o
+   Supabase. Se a nuvem estiver fora do ar, o login local funciona
+   igual e a conta é criada na próxima vez que der certo. */
+function criarContaNuvem(email, senha, papel, depois) {
+  if (!podeNuvem() || !email || !senha) return depois && depois(false);
+  fetch(SUPA_URL + "/auth/v1/signup", {
+    method: "POST", headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: String(email).trim().toLowerCase(), password: senha })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) {
+      var uid = x.j && (x.j.id || (x.j.user && x.j.user.id));
+      if (!uid) {
+        /* e-mail já existe na nuvem: só falta o vínculo, que vem abaixo */
+        return vincularPerfilNuvem(null, email, papel, depois);
+      }
+      vincularPerfilNuvem(uid, email, papel, depois);
+    }).catch(function () { if (depois) depois(false); });
+}
+function vincularPerfilNuvem(uid, email, papel, depois) {
+  if (!uid) return depois && depois(false);
+  var pessoa = DB.users.filter(function (u) { return u.email && u.email.toLowerCase() === String(email).toLowerCase(); })[0];
+  nuvemPedido("/rest/v1/perfis", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      user_id: uid, email: String(email).toLowerCase(),
+      nome: (pessoa && pessoa.nome) || email, tenant_id: T(),
+      perfil: papel === "admin" ? "admin" : "vendedor", ativo: true
+    })
+  }).then(function (r) { if (depois) depois(r.ok); })
+    .catch(function () { if (depois) depois(false); });
+}
+/* trocar a senha aqui troca também na nuvem — nada fica desencontrado */
+function trocarSenhaNuvem(nova, depois) {
+  if (!podeNuvem() || !nuvemViva() || !nova) return depois && depois(false);
+  nuvemPedido("/auth/v1/user", { method: "PUT", body: JSON.stringify({ password: nova }) })
+    .then(function (r) { if (depois) depois(r.ok); })
+    .catch(function () { if (depois) depois(false); });
+}
+/* a pessoa entrou com a senha certa aqui, mas a nuvem recusou:
+   as duas divergiram. Alinhamos usando a sessão local como verdade. */
+function alinharSenhaNuvem(email, senha) {
+  if (!podeNuvem() || nuvemViva()) return;
+  conectarNuvem(email, senha, function (ok) {
+    if (ok) return;
+    /* conta não existe ainda: cria com a senha atual */
+    var u = me();
+    if (u) criarContaNuvem(email, senha, u.perfil, function (feito) {
+      if (feito) conectarNuvem(email, senha);
+    });
+  });
+}
+
+/* ---------------- o que a pessoa vê ---------------- */
+function textoSync() {
+  if (!SYNC.ligado) {
+    if (SYNC.estado === "sem-perfil") return ["Só neste computador", "sem acesso na nuvem para este login"];
+    if (SYNC.estado === "sem-conta") return ["Só neste computador", "conta da nuvem não encontrada"];
+    return ["Só neste computador", "sincronização desligada"];
+  }
+  if (SYNC.estado === "offline") return ["Trabalhando offline", SYNC.fila + " alteração(ões) esperando"];
+  if (SYNC.estado === "enviando") return ["Enviando…", SYNC.fila + " na fila"];
+  if (SYNC.estado === "expirada") return ["Reconectando…", "a sessão da nuvem expirou"];
+  if (SYNC.estado === "erro") return ["Falha ao sincronizar", SYNC.erro];
+  if (SYNC.fila) return ["Sincronizando", SYNC.fila + " na fila"];
+  return ["Tudo sincronizado", SYNC.ultima ? "última troca " + fdt(SYNC.ultima) : "pronto"];
+}
+function pintarSync() {
+  var e = el("sync-chip");
+  if (!e) return;
+  var t = textoSync();
+  var cor = !SYNC.ligado ? "mut" : (SYNC.estado === "offline" || SYNC.estado === "erro") ? "wr"
+    : SYNC.fila ? "inf" : "pos";
+  e.className = "sync " + cor;
+  e.title = t[1];
+  e.innerHTML = '<span class="sync-p"></span>' + esc(t[0]);
+}
+function modalSync() {
+  var t = textoSync();
+  modal("Sincronização",
+    nota("<b>" + esc(t[0]) + "</b> — " + esc(t[1]), SYNC.ligado ? "" : "wr") +
+    ln("Empresa na nuvem", SYNC.tenant ? esc(SYNC.tenant) : "—") +
+    ln("Perfil reconhecido", SYNC.perfil ? esc(SYNC.perfil) : "—") +
+    ln("Alterações na fila", String(SYNC.fila)) +
+    ln("Última troca", SYNC.ultima ? fdt(SYNC.ultima) : "ainda não houve") +
+    '<div class="hp" style="margin-top:12px">Os dados continuam guardados neste computador e sobem quando há internet. ' +
+    "Quem decide o que cada pessoa enxerga é o servidor — não este arquivo.</div>",
+    '<button class="btn" onclick="fecharModal()">Fechar</button>' +
+    '<button class="btn btn-p" onclick="sincronizar();fecharModal();toast(\'Sincronizando…\',\'ok\')">Sincronizar agora</button>');
+}
 
 /* =======================================================================
    HISTÓRICO MENSAL — o mês vira página virada, sem apagar nada
@@ -5863,6 +6252,8 @@ var TOURS = {
         d: "Cada login tem um perfil: administrador vê tudo, vendedor vê só o comercial. Criar um vendedor libera o PDV para ele — e ocupa uma vaga da licença." },
       { alvo: "#page .box", pos: "cima", t: "Histórico mensal",
         d: "No dia 1º o painel recomeça a contar o mês novo — nada é apagado. O mês que passou fica em Histórico mensal, com faturamento, resultado, clientes novos e metas para comparar." },
+      { alvo: "#page .box", pos: "cima", t: "Cópias e registro",
+        d: "Uma vez por dia o servidor guarda uma cópia inteira dos seus dados, longe deste computador. E cada alteração deixa registro de quem fez e quando — escrito pelo servidor, sem como apagar." },
       { alvo: "#page .head .act", pos: "baixo", t: "Backup é seu",
         d: "A exportação completa fica disponível aqui, a qualquer momento. Os dados são da empresa, e sair nunca depende de pedir autorização." }
     ]
@@ -6114,6 +6505,409 @@ function tourDeBoasVindas() {
   setTimeout(function () { if (!Tour.chave) abrirTour("inicio"); }, 700);
 }
 
+
+/* =======================================================================
+   A REDE PELO SERVIDOR  ·  E O AMBIENTE EM QUALQUER APARELHO
+
+   Duas coisas moram aqui, e as duas tiram peso do navegador:
+
+   1) O gestor da rede não guarda mais os dados das empresas dele.
+      Ele pede os TOTAIS ao servidor, que soma por dentro e devolve
+      número. Nenhuma venda, nenhum cliente, nenhuma parcela passa
+      por este arquivo — e não é uma promessa do código: as regras
+      do banco não entregam uma linha crua a quem é 'holding'.
+
+   2) Um computador novo deixa de ser um beco sem saída. Quem já
+      tem acesso na nuvem baixa o próprio ambiente e começa a
+      trabalhar. Senha nenhuma viaja no pacote.
+   ======================================================================= */
+
+/* ---------------- números da rede, vindos do servidor ---------------- */
+var REDE = { por: {}, meses: null, buscando: {}, erro: "", em: null };
+function redeNaNuvem() { return typeof isHolding === "function" && isHolding() && SYNC.ligado && nuvemViva(); }
+function chaveRede(ini, fim) { return ini + "|" + fim; }
+function numRede(x) { var n = Number(x); return isNaN(n) ? 0 : r2(n); }
+function repintar() { if (typeof View !== "undefined" && View.pg && el("page")) ir(View.pg, View.p); }
+
+function pedirRedeNuvem(ini, fim) {
+  var k = chaveRede(ini, fim);
+  if (!redeNaNuvem() || REDE.buscando[k]) return;
+  REDE.buscando[k] = true;
+  nuvemPedido("/rest/v1/rpc/rede_numeros", {
+    method: "POST", body: JSON.stringify({ ini: ini, fim: fim })
+  }).then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (l) {
+      REDE.por[k] = l || [];
+      REDE.em = new Date().toISOString();
+      REDE.buscando[k] = false;
+      if (espelharEmpresasRede(REDE.por[k])) save();
+      repintar();
+    }).catch(function () {
+      REDE.buscando[k] = false;
+      REDE.erro = "Não foi possível falar com o servidor agora.";
+    });
+}
+function pedirMesesRede() {
+  if (!redeNaNuvem() || REDE.buscando.meses) return;
+  REDE.buscando.meses = true;
+  var desde = mIni(addM(today(), -11));
+  nuvemPedido("/rest/v1/rpc/rede_meses", {
+    method: "POST", body: JSON.stringify({ desde: desde })
+  }).then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (l) { REDE.meses = l || []; REDE.buscando.meses = false; repintar(); })
+    .catch(function () { REDE.buscando.meses = false; });
+}
+/* as empresas da rede passam a existir aqui porque o servidor as
+   devolveu — nunca por invenção deste arquivo */
+function espelharEmpresasRede(linhas) {
+  var mudou = false;
+  (linhas || []).forEach(function (x) {
+    var t = find(DB.tenants, x.tenant_id);
+    if (!t) {
+      DB.tenants.push({
+        id: x.tenant_id, nome: x.nome, slug: String(x.tenant_id).toLowerCase(),
+        cidade: "", uf: "", cnpj: "", matriz_id: T(), status: "ativo",
+        criada: today(), licenca: null, daNuvem: true
+      });
+      mudou = true;
+    } else if (t.nome !== x.nome && t.daNuvem) { t.nome = x.nome; mudou = true; }
+  });
+  return mudou;
+}
+function linhaParaNumeros(x) {
+  var fat = numRede(x.faturamento), cart = numRede(x.carteira), atr = numRede(x.atrasado), meta = numRede(x.meta);
+  var t = find(DB.tenants, x.tenant_id);
+  var temGrowth = false;
+  try { temGrowth = !!t && modulosContratados(t).indexOf("growth") >= 0; } catch (e) {}
+  return {
+    id: x.tenant_id, nome: x.nome || "—",
+    faturamento: fat, vendas: Number(x.vendas) || 0, ticket: numRede(x.ticket),
+    receita: numRede(x.receita), despesa: numRede(x.despesa), lucro: numRede(x.lucro),
+    carteira: cart, atrasado: atr,
+    inadimplencia: cart > 0 ? r2(atr / cart * 100) : 0,
+    meta: meta, meta_pct: meta > 0 ? r2(fat / meta * 100) : 0, meta_ok: meta > 0 && fat >= meta,
+    produtos: Number(x.produtos) || 0, estoque_critico: Number(x.estoque_critico) || 0,
+    growth: temGrowth, ultima_venda: x.ultima_venda || null
+  };
+}
+
+/* --- as telas da rede continuam iguais; a origem do número é que muda --- */
+var _numerosDaEmpresaLocal = numerosDaEmpresa;
+numerosDaEmpresa = function (tid, ini, fim) {
+  if (!redeNaNuvem()) return _numerosDaEmpresaLocal(tid, ini, fim);
+  var l = REDE.por[chaveRede(ini, fim)];
+  if (!l) { pedirRedeNuvem(ini, fim); return null; }
+  var x = l.filter(function (y) { return y.tenant_id === tid; })[0];
+  return x ? linhaParaNumeros(x) : null;
+};
+var _numerosDaRedeLocal = numerosDaRede;
+numerosDaRede = function (ini, fim) {
+  if (!redeNaNuvem()) return _numerosDaRedeLocal(ini, fim);
+  var l = REDE.por[chaveRede(ini, fim)];
+  if (!l) { pedirRedeNuvem(ini, fim); return []; }
+  return l.map(linhaParaNumeros);
+};
+var _faturamentoPeriodoLocal = faturamentoPeriodo;
+faturamentoPeriodo = function (ini, fim, tid) {
+  tid = tid || T();
+  if (!redeNaNuvem() || tid === T()) return _faturamentoPeriodoLocal(ini, fim, tid);
+  if (!REDE.meses) { pedirMesesRede(); return 0; }
+  var de = String(ini).substring(0, 7), ate = String(fim).substring(0, 7), tot = 0;
+  REDE.meses.forEach(function (m) {
+    if (m.tenant_id === tid && m.mes >= de && m.mes <= ate) tot += Number(m.faturamento) || 0;
+  });
+  return r2(tot);
+};
+/* enquanto o servidor responde, a tela diz a verdade: está buscando */
+var _semEmpresasLocal = semEmpresas;
+semEmpresas = function (titulo) {
+  if (redeNaNuvem() && !REDE.em) {
+    return head(titulo, org().nome, "") + '<div class="box"><div class="box-b">' +
+      nota("Buscando os números das empresas da rede no servidor…", "inf") + "</div></div>";
+  }
+  if (REDE.erro) {
+    return head(titulo, org().nome, "") + '<div class="box"><div class="box-b">' +
+      nota(esc(REDE.erro), "wr") +
+      '<button class="btn" onclick="REDE.erro=\'\';REDE.por={};repintar()">Tentar de novo</button></div></div>';
+  }
+  return _semEmpresasLocal(titulo);
+};
+
+/* =======================================================================
+   O AMBIENTE EM QUALQUER APARELHO
+   ======================================================================= */
+var K_AMB = "vyora_ambiente_espelho";
+var CAMPOS_SEGREDO = ["senha", "senha_hash", "salt", "senha_em", "provisoria", "tentativas", "bloqueio_ate", "bloqueado_ate", "acesso"];
+
+function semSegredos(u) {
+  var c = {};
+  for (var k in u) if (u.hasOwnProperty(k) && CAMPOS_SEGREDO.indexOf(k) < 0) c[k] = u[k];
+  return c;
+}
+function pacoteAmbiente() {
+  var t = find(DB.tenants, T());
+  if (!t) return null;
+  return {
+    tenant: t,
+    config: DB.config.filter(function (x) { return x.tenant_id === T(); })[0] || null,
+    users: DB.users.filter(function (u) { return u.tenant_id === T(); }).map(semSegredos)
+  };
+}
+function publicarAmbiente(depois) {
+  if (!SYNC.ligado || !nuvemViva()) return depois && depois(false);
+  if (["admin", "holding"].indexOf(SYNC.perfil) < 0) return depois && depois(false);
+  var p = pacoteAmbiente();
+  if (!p) return depois && depois(false);
+  var a = JSON.stringify(p);
+  if (Store.get(K_AMB) === a) return depois && depois(true);
+  nuvemPedido("/rest/v1/ambientes", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ tenant_id: T(), dados: p })
+  }).then(function (r) {
+    if (r.ok) Store.set(K_AMB, a);
+    if (depois) depois(r.ok);
+  }).catch(function () { if (depois) depois(false); });
+}
+/* instala o pacote sem encostar em senha nenhuma que já exista aqui */
+function instalarAmbiente(p) {
+  if (!p || !p.tenant) return false;
+  var t = find(DB.tenants, p.tenant.id);
+  if (t) { for (var k in p.tenant) if (p.tenant.hasOwnProperty(k)) t[k] = p.tenant[k]; }
+  else DB.tenants.push(p.tenant);
+  if (p.config) {
+    var c = DB.config.filter(function (x) { return x.tenant_id === p.config.tenant_id; })[0];
+    if (c) { for (var j in p.config) if (p.config.hasOwnProperty(j)) c[j] = p.config[j]; }
+    else DB.config.push(p.config);
+  }
+  (p.users || []).forEach(function (u) {
+    var atual = find(DB.users, u.id);
+    if (atual) {
+      for (var m in u) if (u.hasOwnProperty(m) && CAMPOS_SEGREDO.indexOf(m) < 0) atual[m] = u[m];
+    } else {
+      u.senha_pela_nuvem = true;
+      DB.users.push(u);
+    }
+  });
+  return true;
+}
+function baixarAmbiente(depois) {
+  if (!nuvemViva()) return depois && depois(false);
+  nuvemPedido("/rest/v1/ambientes?select=dados,atualizado_em&limit=1", { method: "GET" })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (l) {
+      var linha = (l || [])[0];
+      if (!linha || !linha.dados) return depois && depois(false);
+      var mudou = instalarAmbiente(linha.dados);
+      if (mudou) save();
+      if (depois) depois(mudou);
+    }).catch(function () { if (depois) depois(false); });
+}
+
+/* ---------------- primeiro acesso num computador novo ---------------- */
+function modalPrimeiroAcesso() {
+  modal("Primeiro acesso neste aparelho",
+    nota("Entre com o <b>mesmo e-mail e a mesma senha</b> que você já usa no sistema. " +
+      "O ambiente da sua empresa é baixado para este computador e o acesso segue normalmente.", "inf") +
+    '<div class="fld"><label>E-mail <span class="rq">*</span></label>' +
+    '<input id="pa-mail" type="email" autocomplete="username" placeholder="voce@suaempresa.com.br"></div>' +
+    '<div class="fld"><label>Senha <span class="rq">*</span></label>' +
+    '<input id="pa-senha" type="password" autocomplete="current-password"></div>' +
+    '<div id="pa-err" class="note ng hidden"></div>' +
+    '<div class="hp">Se este computador não é seu, saia da conta ao terminar. ' +
+    "O sistema não guarda a sua senha em lugar nenhum.</div>",
+    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
+    '<button class="btn btn-p" id="pa-btn" onclick="baixarMeuAmbiente()">Baixar o meu ambiente</button>');
+}
+function baixarMeuAmbiente() {
+  var err = el("pa-err"), btn = el("pa-btn");
+  function bad(m) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); btn.disabled = false; btn.textContent = "Baixar o meu ambiente"; }
+  var mail = String(v("pa-mail")).trim().toLowerCase(), senha = v("pa-senha");
+  if (mail.indexOf("@") < 0) return bad("Informe o seu e-mail.");
+  if (!senha) return bad("Informe a sua senha.");
+  btn.disabled = true; btn.textContent = "Buscando…";
+  conectarNuvem(mail, senha, function (ok) {
+    if (!ok) return bad("Não reconhecemos este e-mail e senha, ou o seu acesso ainda não foi liberado. Fale com o administrador da sua empresa.");
+    baixarAmbiente(function () {
+      var u = DB.users.filter(function (x) { return x.email && x.email.toLowerCase() === mail; })[0];
+      if (!u) return bad("O seu acesso existe na nuvem, mas o ambiente da empresa ainda não foi publicado. Peça ao administrador para abrir o sistema uma vez.");
+      protegerSenha(u, senha);
+      delete u.senha_pela_nuvem;
+      u.status = u.status || "ativo";
+      save();
+      fecharModal();
+      window.__env = u.tenant_id;
+      toast("Ambiente instalado neste aparelho.", "ok");
+      Sess = marcarSessao({ tenant_id: u.tenant_id, user_id: u.id });
+      Store.set(SKEY, JSON.stringify(Sess));
+      logar("Ambiente baixado em novo aparelho", u.nome);
+      save(); iniciarApp();
+      contarFila(); pintarSync(); lacoSync();
+    });
+  });
+}
+/* a senha certa é a da nuvem: se aqui estiver velha ou faltando,
+   a nuvem confirma e o aparelho se acerta sozinho */
+function senhaPelaNuvem(u, senha, ok, nao) {
+  if (!podeNuvem() || !u || !u.email) return nao();
+  conectarNuvem(u.email, senha, function (deu) {
+    if (!deu) return nao();
+    protegerSenha(u, senha);
+    delete u.senha_pela_nuvem;
+    save();
+    ok();
+  });
+}
+
+/* ---------------- o ambiente se mantém em dia ---------------- */
+var _ambienteEm = 0;
+function cuidarDoAmbiente() {
+  if (!SYNC.ligado || !nuvemViva()) return;
+  if (Date.now() - _ambienteEm < 300000) return;
+  _ambienteEm = Date.now();
+  if (["admin", "holding"].indexOf(SYNC.perfil) >= 0) publicarAmbiente();
+  else baixarAmbiente();
+}
+var _sincronizarSemAmbiente = sincronizar;
+sincronizar = function (depois) {
+  cuidarDoAmbiente();
+  if (redeNaNuvem()) { REDE.por = {}; REDE.meses = null; }
+  return _sincronizarSemAmbiente(depois);
+};
+
+/* =======================================================================
+   CÓPIAS E REGISTRO — o que sobra quando algo dá errado
+
+   Duas perguntas que toda empresa faz cedo ou tarde:
+     "e se eu perder o computador?"      → a cópia do dia, no servidor
+     "quem mexeu nisso?"                 → o registro, escrito pelo banco
+
+   Nenhuma das duas depende de alguém lembrar de fazer. A cópia é
+   guardada sozinha uma vez por dia. O registro é escrito pelo próprio
+   servidor a cada alteração e não pode ser alterado nem apagado por
+   ninguém que use o sistema — nem pelo administrador da empresa.
+   ======================================================================= */
+var COPIAS = { lista: [], carregando: false, erro: "", ultima: null, feita: null };
+var REGISTRO = { lista: [], carregando: false, erro: "" };
+
+function copiasDisponiveis() { return SYNC.ligado && nuvemViva() && ["admin", "holding"].indexOf(SYNC.perfil) >= 0; }
+
+function garantirCopiaDoDia(depois) {
+  if (!copiasDisponiveis()) return depois && depois(false);
+  nuvemPedido("/rest/v1/rpc/copia_do_dia", { method: "POST", body: "{}" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      var x = j && j.length ? j[0] : (j && j.copia_id ? j : null);
+      if (x) { COPIAS.feita = x.copia_em || null; COPIAS.ultima = x.copia_em || null; }
+      if (depois) depois(!!x);
+    }).catch(function () { if (depois) depois(false); });
+}
+function carregarCopias() {
+  if (!copiasDisponiveis()) return;
+  COPIAS.carregando = true; COPIAS.erro = "";
+  nuvemPedido("/rest/v1/minhas_copias?select=id,feito_em,itens&order=feito_em.desc&limit=12", { method: "GET" })
+    .then(function (r) {
+      if (r.status === 404) throw new Error("As cópias ainda não foram ligadas no servidor.");
+      return r.ok ? r.json() : [];
+    })
+    .then(function (l) {
+      COPIAS.lista = l || [];
+      COPIAS.ultima = COPIAS.lista.length ? COPIAS.lista[0].feito_em : null;
+      COPIAS.carregando = false;
+      if (View.pg === "config" && UI.cfgTab === "copias") ir("config", { tab: "copias" });
+    })
+    .catch(function (e) { COPIAS.carregando = false; COPIAS.erro = e.message || "Sem resposta do servidor."; });
+}
+function carregarRegistroNuvem() {
+  if (!copiasDisponiveis()) return;
+  REGISTRO.carregando = true; REGISTRO.erro = "";
+  nuvemPedido("/rest/v1/auditoria?select=quando,email,tabela,registro,operacao,excluido&order=quando.desc&limit=40", { method: "GET" })
+    .then(function (r) {
+      if (r.status === 404) throw new Error("O registro ainda não foi ligado no servidor.");
+      return r.ok ? r.json() : [];
+    })
+    .then(function (l) {
+      REGISTRO.lista = l || []; REGISTRO.carregando = false;
+      if (View.pg === "config" && UI.cfgTab === "copias") ir("config", { tab: "copias" });
+    })
+    .catch(function (e) { REGISTRO.carregando = false; REGISTRO.erro = e.message || "Sem resposta do servidor."; });
+}
+/* a cópia que fica com a empresa, no computador dela */
+function baixarCopiaLocal() {
+  var pacote = { empresa: org().nome, tenant_id: T(), gerado_em: new Date().toISOString(), dados: {} };
+  ["customers", "products", "moves", "sales", "parcels", "cash", "metas", "cobrancas", "acordos", "leads"]
+    .forEach(function (col) { pacote.dados[col] = Q(col); });
+  var itens = 0;
+  for (var k in pacote.dados) if (pacote.dados.hasOwnProperty(k)) itens += pacote.dados[k].length;
+  pacote.itens = itens;
+  dl("copia-" + (org().slug || "empresa") + "-" + today() + ".json", JSON.stringify(pacote, null, 1), "application/json");
+  logar("Cópia baixada", itens + " registros");
+  save();
+  toast("Cópia com " + n0(itens) + " registros baixada. Guarde fora deste computador.", "ok");
+}
+function rotuloTabela(t) {
+  var m = {
+    customers: "Clientes", products: "Produtos", moves: "Estoque", sales: "Vendas",
+    parcels: "Parcelas", cash: "Caixa", metas: "Metas", cobrancas: "Cobranças",
+    acordos: "Acordos", leads_empresa: "Leads"
+  };
+  return m[t] || t;
+}
+function corpoCopias() {
+  if (!copiasDisponiveis()) {
+    return '<div class="box"><div class="box-b">' +
+      nota("Este ambiente ainda não está ligado ao servidor da Vyora, então não há cópia automática nem registro central. " +
+        "Você pode baixar uma cópia agora e guardá-la fora deste computador.", "wr") +
+      '<button class="btn btn-p" onclick="baixarCopiaLocal()">Baixar uma cópia agora</button></div></div>';
+  }
+  if (!COPIAS.lista.length && !COPIAS.carregando && !COPIAS.erro) setTimeout(carregarCopias, 0);
+  if (!REGISTRO.lista.length && !REGISTRO.carregando && !REGISTRO.erro) setTimeout(carregarRegistroNuvem, 0);
+
+  var atual = COPIAS.ultima ? Math.floor((Date.now() - new Date(COPIAS.ultima).getTime()) / 86400000) : null;
+  var h = '<div class="grid c3" style="margin-bottom:18px">' +
+    metric("Última cópia no servidor",
+      COPIAS.ultima ? (atual <= 0 ? "hoje" : atual + " dia(s) atrás") : "—",
+      COPIAS.ultima ? fdt(COPIAS.ultima) : "ainda não houve", atual !== null && atual > 2 ? "wr" : "pos") +
+    metric("Cópias guardadas", n0(COPIAS.lista.length), "das últimas semanas") +
+    metric("Alterações registradas", n0(REGISTRO.lista.length), "das mais recentes") +
+    "</div>";
+
+  h += '<div class="grid c21">';
+  h += box("Cópias de segurança", '<div class="box-b">' +
+    (COPIAS.erro ? nota(esc(COPIAS.erro), "wr") : "") +
+    '<div class="sm mut" style="margin-bottom:14px">Uma vez por dia, o servidor guarda uma cópia inteira dos dados desta empresa. ' +
+    "Ela fica fora deste computador e fora do seu alcance — nem você nem ninguém que use o sistema consegue apagá-la. " +
+    "Se precisar restaurar, a Vyora faz isso para você.</div>" +
+    (COPIAS.lista.length
+      ? COPIAS.lista.slice(0, 6).map(function (c) {
+        return '<div class="ln"><span class="k">' + fdt(c.feito_em) + '</span><span class="v sm">' + n0(c.itens) + " registros</span></div>";
+      }).join("")
+      : '<div class="sm mut">' + (COPIAS.carregando ? "Consultando o servidor…" : "Nenhuma cópia registrada ainda.") + "</div>") +
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">' +
+    '<button class="btn btn-p" onclick="garantirCopiaDoDia(function(){carregarCopias();toast(\'Cópia do dia confirmada.\',\'ok\')})">Fazer a cópia agora</button>' +
+    '<button class="btn" onclick="baixarCopiaLocal()">Baixar uma cópia para mim</button></div></div>');
+
+  h += box("Registro do servidor", '<div class="box-b">' +
+    (REGISTRO.erro ? nota(esc(REGISTRO.erro), "wr") : "") +
+    '<div class="sm mut" style="margin-bottom:14px">Cada alteração que chega ao servidor deixa esta linha. ' +
+    "Quem escreve é o banco de dados, não o sistema — por isso ela não pode ser alterada nem apagada por ninguém.</div>" +
+    (REGISTRO.lista.length
+      ? REGISTRO.lista.slice(0, 12).map(function (r) {
+        return '<div class="ln"><span class="k">' + fdt(r.quando) + " · " + esc(rotuloTabela(r.tabela)) + "</span>" +
+          '<span class="v sm">' + esc(r.email || "—") + (r.excluido ? " · excluiu" : r.operacao === "INSERT" ? " · criou" : " · alterou") + "</span></div>";
+      }).join("")
+      : '<div class="sm mut">' + (REGISTRO.carregando ? "Consultando o servidor…" : "Nenhuma alteração registrada ainda.") + "</div>") +
+    '<button class="btn" style="margin-top:16px" onclick="carregarRegistroNuvem()">Atualizar</button></div>');
+  h += "</div>";
+  return h;
+}
+
+/* a cópia acontece sozinha: ninguém precisa lembrar */
+var _cuidarSemCopia = cuidarDoAmbiente;
+cuidarDoAmbiente = function () {
+  _cuidarSemCopia();
+  if (copiasDisponiveis() && !COPIAS.feita) garantirCopiaDoDia();
+};
 (function () {
   if (!load()) seed();
   if (!DB.rede) DB.rede = { buscar_ativo: false, minimo_empresas: 3 };

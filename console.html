@@ -293,30 +293,42 @@ tr.clik:hover td{background:#fafbfc}
 .lic-t{display:flex;justify-content:space-between;font-size:13px}
 .lic-t b{font-weight:640}
 
-/* ---------- leads do site ---------- */
-.ld-fun{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
-.seg-b{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 14px;
-  font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:.15s}
-.seg-b b{color:var(--brand);margin-left:4px}
-.seg-b:hover{border-color:var(--brand-line)}
-.seg-b.on{background:var(--brand);border-color:var(--brand);color:#fff}
-.seg-b.on b{color:#fff}
-.ld{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);
-  padding:18px 20px;margin-bottom:12px}
-.ld-h{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
-.ld-h b{font-size:15px;font-weight:660}
-.ld-h .tag{margin-left:auto;flex:none}
-.ld-n{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-@media(max-width:760px){.ld-n{grid-template-columns:repeat(2,1fr)}}
-.ld-n>div{display:flex;flex-direction:column}
-.ld-n span{font-size:11.5px;color:var(--ink-3)}
-.ld-n b{font-size:15px;font-weight:650}
-.ld-l{margin-top:12px;font-size:14px;font-weight:600;color:var(--brand)}
-.ld-o{margin-top:10px;padding-left:12px;border-left:2px solid var(--line);font-size:13px;
+/* ---------- acessos na nuvem ---------- */
+.ac-p{display:flex;align-items:center;gap:12px;padding:12px 0;flex-wrap:wrap}
+.ac-p .av{width:36px;height:36px;border-radius:11px;font-size:12.5px;flex:none}
+.ac-p b{font-size:13.5px}
+@media(max-width:560px){.ac-p .btn{flex:1}}
+
+/* ---------- leads do site: kanban ---------- */
+.kan{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(232px,1fr);gap:12px;
+  overflow-x:auto;padding-bottom:8px;align-items:start}
+.kcol{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px;min-height:180px;
+  transition:.15s}
+.kcol.sobre{border-color:var(--brand);background:var(--brand-soft)}
+.kcol.ok{border-color:var(--grow)}
+.kcol.off{opacity:.85}
+.kcol-h{display:flex;align-items:center;gap:8px;padding:2px 4px 10px}
+.kcol-h b{font-size:12.5px;font-weight:660}
+.kcol-h span{margin-left:auto;font-size:11.5px;color:var(--ink-3);background:var(--card);
+  border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.kcol-b{display:flex;flex-direction:column;gap:8px;min-height:60px}
+.kvazio{font-size:11.5px;color:var(--ink-3);text-align:center;padding:18px 6px;border:1px dashed var(--line);border-radius:10px}
+.kd{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:grab;
+  box-shadow:var(--sh);transition:.14s}
+.kd:hover{border-color:var(--brand-line);transform:translateY(-1px)}
+.kd.indo{opacity:.45}
+.kd b{display:block;font-size:13px;font-weight:650;line-height:1.3}
+.kd-s{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+.kd-n{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.kd-n span{font-size:10.5px;color:var(--ink-2);background:var(--bg);border:1px solid var(--line);
+  border-radius:999px;padding:2px 7px}
+.kd-n .ad{color:var(--grow-deep);border-color:var(--grow)}
+.kd-m{margin-top:7px;font-size:11px;color:var(--danger)}
+.kd-d{margin-top:7px;font-size:10.5px;color:var(--ink-3)}
+.ld-o{margin-top:12px;padding-left:12px;border-left:2px solid var(--line);font-size:13px;
   color:var(--ink-2);line-height:1.6}
-.ld-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;
-  border-top:1px solid var(--line-2)}
-.ld-f select{height:32px;border:1px solid var(--line);border-radius:9px;padding:0 8px;font-size:12.5px}
+@media(max-width:760px){.kan{grid-auto-columns:minmax(210px,80%)}}
+
 </style>
 </head>
 <body>
@@ -1017,6 +1029,7 @@ var MENU = [
   { k: "financeiro", n: "Financeiro Vyora", i: "financeiro" },
   { k: "cobranca", n: "Cobrança", i: "fatura" },
   { k: "contratos", n: "Contratos", i: "file" },
+  { k: "acessos", n: "Acessos na nuvem", i: "seguranca" },
   { k: "sessoes", n: "Acessos e sessões", i: "seguranca" },
   { k: "auditoria", n: "Auditoria", i: "file" },
   { k: "monitor", n: "Monitoramento", i: "plataforma" },
@@ -1025,7 +1038,7 @@ var MENU = [
 var GRUPOS = [
   ["Operação", ["exec", "notificacoes", "leads", "empresas", "solicitacoes", "implantacoes", "suporte"]],
   ["Negócio", ["financeiro", "cobranca", "contratos"]],
-  ["Plataforma", ["sessoes", "auditoria", "monitor"]],
+  ["Plataforma", ["acessos", "sessoes", "auditoria", "monitor"]],
   ["Ajustes", ["globais"]]
 ];
 var TITULOS = {
@@ -1034,6 +1047,7 @@ var TITULOS = {
   leads: ["Leads do site", "Diagnósticos recebidos pelo site institucional"],
   solicitacoes: ["Solicitações", "Pedidos das empresas aguardando decisão da Vyora"],
   implantacoes: ["Implantações", "Do contrato assinado até a operação assistida"],
+  acessos: ["Acessos na nuvem", "Identidade de quem usa a plataforma"],
   sessoes: ["Acessos e sessões", "Quem está dentro da plataforma agora"],
   auditoria: ["Auditoria", "Registro permanente das ações administrativas"],
   globais: ["Configurações globais", "Parâmetros compartilhados por toda a plataforma"],
@@ -2292,7 +2306,12 @@ function provisionar(t, senhaEscolhida) {
     adm.provisoria = t.senha_provisoria;
     protegerSenha(adm, t.senha_provisoria);
     DB.users.push(adm);
+    /* a conta na nuvem nasce junto com o ambiente — sem passo manual */
+    criarContaNuvemConsole(adm.email, t.senha_provisoria, t.id,
+      hold ? "holding" : "admin", adm.nome);
   }
+  /* e o servidor passa a saber quem é esta empresa e de qual rede */
+  registrarEmpresaNuvem(t);
   gerarFaturas(t);
   var im = implantacaoDe(t.id) || (DB.implantacoes.push(novaImplantacao(t, false)), implantacaoDe(t.id));
   im.etapa = "implantacao";
@@ -3539,9 +3558,14 @@ function atualizarSituacoes() {
 var SUPA_TOKEN = null, SUPA_EXP = 0, SUPA_USER = "";
 var LEADS = { lista: [], carregando: false, erro: "", filtro: "", busca: "" };
 var FUNIL = [
-  ["novo", "Novo"], ["contato", "Em contato"], ["qualificado", "Qualificado"],
-  ["proposta", "Proposta"], ["ganho", "Ganho"], ["perdido", "Perdido"]
+  ["novo", "Novo"], ["abordado", "Abordado"], ["proposta", "Proposta enviada"],
+  ["followup", "Follow up"], ["ganho", "Ganho"], ["perdido", "Perdido"]
 ];
+var MOTIVOS_PERDA = ["Não atendeu", "Não respondeu", "Não interessado", "Baixíssimo potencial"];
+function rotuloFunil(k) {
+  var f = FUNIL.filter(function (x) { return x[0] === k; })[0];
+  return f ? f[1] : k;
+}
 /* conexão já vem preenchida — são dados públicos (a chave publishable só
    consegue INSERIR na tabela leads). O que continua sendo seu e nunca entra
    no arquivo é o e-mail e a senha que leem os leads. */
@@ -3561,7 +3585,7 @@ function supaConfigurado() {
 function salvarSupabase() {
   DB.global.supabase = { url: String(v("sb-url")).trim().replace(/\/$/, ""), key: String(v("sb-key")).trim() };
   auditar("Supabase configurado", "leads", DB.global.supabase.url);
-  save(); fecharModal(); toast("Conexão salva.", "ok"); ir("leads");
+  save(); toast("Conexão salva.", "ok"); ir("leads");
 }
 function supaAutenticado() { return !!SUPA_TOKEN && Date.now() < SUPA_EXP; }
 function supaSair() { SUPA_TOKEN = null; SUPA_EXP = 0; SUPA_USER = ""; esquecerSessaoSupa(); ir("leads"); }
@@ -3644,69 +3668,161 @@ function carregarLeads() {
     .then(function (j) { LEADS.lista = j || []; LEADS.carregando = false; pintarLeads(); })
     .catch(function (e) { LEADS.carregando = false; LEADS.erro = e.message || "Falha ao ler os leads."; pintarLeads(); });
 }
-function mudarStatusLead(id, novo) {
+function leadPorId(id) { return LEADS.lista.filter(function (x) { return x.id === id; })[0]; }
+function gravarLead(id, campos, depois) {
   supaPedido("/rest/v1/leads?id=eq." + encodeURIComponent(id), {
     method: "PATCH", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ status: novo, atualizado_em: new Date().toISOString() })
+    body: JSON.stringify(Object.assign({ atualizado_em: new Date().toISOString() }, campos))
   }).then(function (r) {
     if (!r.ok) return toast("Não foi possível atualizar o lead.", "err");
-    LEADS.lista.forEach(function (x) { if (x.id === id) x.status = novo; });
-    auditar("Lead do site atualizado", id, "status: " + novo);
-    save(); pintarLeads(); toast("Lead movido para " + novo + ".", "ok");
+    var l = leadPorId(id);
+    if (l) Object.assign(l, campos);
+    auditar("Lead do site atualizado", id, JSON.stringify(campos));
+    save(); pintarLeads();
+    if (depois) depois();
   }).catch(function () { toast("Sem resposta do Supabase.", "err"); });
 }
-function leadParaEmpresa(id) {
-  var l = LEADS.lista.filter(function (x) { return x.id === id; })[0];
-  if (!l) return;
-  modalEmpresa();
-  setTimeout(function () {
-    if (el("em-nome")) el("em-nome").value = l.empresa || "";
-    if (el("em-seg")) el("em-seg").value = l.segmento || "";
-    if (el("em-mail")) el("em-mail").value = l.email || "";
-    if (el("em-tel")) el("em-tel").value = l.telefone || "";
-    if (el("em-func")) el("em-func").value = l.porte || "";
-  }, 0);
+/* mover no funil: perder exige motivo, ganhar abre o cadastro da empresa */
+function mudarStatusLead(id, novo) {
+  var l = leadPorId(id);
+  if (!l || String(l.status || "novo") === novo) return;
+  if (novo === "perdido") return modalPerdaLead(id);
+  gravarLead(id, { status: novo, motivo_perda: null }, function () {
+    toast("Lead em " + rotuloFunil(novo) + ".", "ok");
+    if (novo === "ganho") leadParaEmpresa(id);
+  });
 }
-function contatoLead(id) {
-  var l = LEADS.lista.filter(function (x) { return x.id === id; })[0];
+function modalPerdaLead(id) {
+  var l = leadPorId(id);
   if (!l) return;
-  var tel = String(l.telefone || "").replace(/\D/g, "");
-  if (!tel) return toast("Este lead não deixou telefone — use o e-mail.", "err");
-  if (tel.length <= 11) tel = "55" + tel;
-  window.open("https://wa.me/" + tel + "?text=" + encodeURIComponent(
-    "Olá, " + (l.nome || "") + "! Aqui é da Vyora. Recebemos o seu Diagnóstico Estratégico" +
-    (l.empresa ? " da " + l.empresa : "") + " e queria conversar sobre o que apareceu nele."), "_blank");
+  modal("Por que este lead se perdeu?",
+    nota("O motivo é obrigatório: é ele que mostra, no fim do mês, se o problema está na captação ou na abordagem.", "wr") +
+    '<div class="fld"><label>Motivo <span class="rq">*</span></label><select id="lp-motivo">' +
+    '<option value="">Selecione…</option>' +
+    MOTIVOS_PERDA.map(function (m) { return "<option>" + esc(m) + "</option>"; }).join("") + "</select></div>" +
+    '<div class="fld"><label>Observação (opcional)</label><input id="lp-obs" placeholder="O que aconteceu"></div>' +
+    '<div id="lp-err" class="note ng hidden"></div>',
+    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
+    '<button class="btn btn-d" onclick="salvarPerdaLead(\'' + esc(id) + '\')">Marcar como perdido</button>');
 }
-function cardLead(l) {
-  var st = String(l.status || "novo");
-  var areas = Array.isArray(l.areas) ? l.areas.join(", ") : (l.areas || "");
-  var recs = Array.isArray(l.sugeridos) ? l.sugeridos.join(" + ") : (l.sugeridos || "");
-  return '<div class="ld">' +
-    '<div class="ld-h"><div><b>' + esc(l.empresa || "(sem empresa)") + "</b>" +
-    '<div class="sm mut">' + esc(l.nome || "") + (l.telefone ? " · " + esc(l.telefone) : "") +
-    (l.email ? " · " + esc(l.email) : "") + "</div></div>" +
-    '<span class="tag ' + (st === "ganho" ? "t-pos" : st === "perdido" ? "t-mut" : st === "novo" ? "t-inf" : "t-wr") + '">' +
-    esc((FUNIL.filter(function (f) { return f[0] === st; })[0] || ["", st])[1]) + "</span></div>" +
-    '<div class="ld-n">' +
-    "<div><span>Maturidade</span><b>" + (l.maturidade != null ? l.maturidade + "/10" : "—") + "</b></div>" +
-    "<div><span>Aderência</span><b>" + (l.aderencia != null ? l.aderencia + "%" : "—") + "</b></div>" +
-    "<div><span>Equipe</span><b>" + esc(l.porte || "—") + "</b></div>" +
-    "<div><span>Objetivo</span><b>" + esc(l.objetivo || "—") + "</b></div>" +
+function salvarPerdaLead(id) {
+  var motivo = v("lp-motivo"), err = el("lp-err");
+  if (!motivo) {
+    err.innerHTML = "<span>" + ICON.alert + "</span><div>Escolha o motivo da perda.</div>";
+    err.classList.remove("hidden");
+    return;
+  }
+  var obs = v("lp-obs");
+  gravarLead(id, { status: "perdido", motivo_perda: motivo + (obs ? " — " + obs : "") }, function () {
+    fecharModal(); toast("Lead encerrado.", "ok");
+  });
+}
+function excluirLead(id) {
+  var l = leadPorId(id);
+  if (!l) return;
+  confirmar("Excluir o lead de " + esc(l.empresa || l.nome || "sem nome") + "?",
+    "O diagnóstico sai do banco para sempre — é o que fazemos quando a pessoa pede exclusão dos dados (LGPD). Não dá para desfazer.",
+    function () { apagarLead(id); }, "Excluir", true);
+}
+function apagarLead(id) {
+  var l = leadPorId(id);
+  if (!l) return;
+  supaPedido("/rest/v1/leads?id=eq." + encodeURIComponent(id), {
+    method: "DELETE", headers: { Prefer: "return=minimal" }
+  }).then(function (r) {
+    if (!r.ok) return toast("O banco recusou a exclusão. Rode a migração do SQL que libera apagar.", "err");
+    LEADS.lista = LEADS.lista.filter(function (x) { return x.id !== id; });
+    auditar("Lead do site excluído", id, l.empresa || l.nome || "");
+    save(); fecharModal(); pintarLeads(); toast("Lead excluído.", "ok");
+  }).catch(function () { toast("Sem resposta do Supabase.", "err"); });
+}
+/* ---------- kanban ---------- */
+function cartaoLead(l) {
+  var nome = l.empresa || l.nome || "(sem nome)";
+  return '<div class="kd" draggable="true" data-id="' + esc(l.id) + '" onclick="drawerLead(\'' + esc(l.id) + '\')">' +
+    "<b>" + esc(nome) + "</b>" +
+    '<div class="kd-s">' + esc(l.nome || "") + (l.telefone ? " · " + esc(l.telefone) : "") + "</div>" +
+    '<div class="kd-n">' +
+    (l.maturidade != null ? '<span title="maturidade">' + l.maturidade + "/10</span>" : "") +
+    (l.aderencia != null ? '<span class="ad" title="aderência">' + l.aderencia + "%</span>" : "") +
+    (l.porte ? "<span>" + esc(l.porte) + "</span>" : "") +
     "</div>" +
-    (l.leitura ? '<p class="ld-l">' + esc(l.leitura) + "</p>" : "") +
-    '<div class="sm mut" style="margin-top:8px">' +
-    (l.desafio ? "Maior desafio: <b>" + esc(l.desafio) + "</b>. " : "") +
-    (areas ? "Áreas: " + esc(areas) + ". " : "") +
-    (recs ? "Sugerido: " + esc(recs) + "." : "") + "</div>" +
-    (l.observacao ? '<p class="ld-o">“' + esc(l.observacao) + '”</p>' : "") +
-    '<div class="ld-f"><select onchange="mudarStatusLead(\'' + esc(l.id) + '\',this.value)">' +
-    FUNIL.map(function (f) { return '<option value="' + f[0] + '"' + (st === f[0] ? " selected" : "") + ">" + f[1] + "</option>"; }).join("") +
-    "</select>" +
-    '<button class="btn btn-s" onclick="contatoLead(\'' + esc(l.id) + '\')">WhatsApp</button>' +
-    '<button class="btn btn-s btn-p" onclick="leadParaEmpresa(\'' + esc(l.id) + '\')">Virar empresa</button>' +
-    '<span class="sm mut" style="margin-left:auto">' + (l.criado_em ? fdt(l.criado_em) : "") +
-    (l.utm_source ? " · " + esc(l.utm_source) : "") + "</span></div>" +
+    (l.motivo_perda ? '<div class="kd-m">' + esc(l.motivo_perda) + "</div>" : "") +
+    '<div class="kd-d">' + (l.criado_em ? fdate(String(l.criado_em).substring(0, 10)) : "") +
+    (l.utm_source ? " · " + esc(l.utm_source) : "") + "</div>" +
     "</div>";
+}
+function drawerLead(id) {
+  var l = leadPorId(id);
+  if (!l) return;
+  var areas = Array.isArray(l.areas) ? l.areas.join(", ") : (l.areas || "—");
+  var recs = Array.isArray(l.sugeridos) ? l.sugeridos.join(" + ") : (l.sugeridos || "—");
+  modal(esc(l.empresa || l.nome || "Lead"),
+    '<div class="grid c3" style="margin-bottom:14px">' +
+      metric("Maturidade", (l.maturidade != null ? l.maturidade + "/10" : "—"), "leitura automática") +
+      metric("Aderência", (l.aderencia != null ? l.aderencia + "%" : "—"), "às soluções Vyora") +
+      metric("Etapa", rotuloFunil(String(l.status || "novo")), l.motivo_perda ? esc(l.motivo_perda) : "no funil") +
+    "</div>" +
+    (l.leitura ? nota("<b>" + esc(l.leitura) + "</b>", "") : "") +
+    '<div class="box"><div class="box-b">' +
+      ln("Contato", esc(l.nome || "—") + (l.telefone ? " · " + esc(l.telefone) : "") + (l.email ? " · " + esc(l.email) : "")) +
+      ln("Segmento", esc(l.segmento || "—")) +
+      ln("Equipe", esc(l.porte || "—")) +
+      ln("Maior desafio", esc(l.desafio || "—")) +
+      ln("Sistema hoje", esc(l.sistema || "—") + (l.sistema_qual ? " (" + esc(l.sistema_qual) + ")" : "")) +
+      ln("Áreas de atenção", esc(areas)) +
+      ln("Objetivo em 12 meses", esc(l.objetivo || "—")) +
+      ln("Sugerido", esc(recs)) +
+      ln("Chegou em", l.criado_em ? fdt(l.criado_em) : "—") +
+      (l.utm_source || l.utm_campaign ? ln("Campanha", esc([l.utm_source, l.utm_campaign].filter(Boolean).join(" / "))) : "") +
+    "</div></div>" +
+    (l.observacao ? '<p class="ld-o">“' + esc(l.observacao) + '”</p>' : "") +
+    '<div class="fld" style="margin-top:16px"><label>Etapa do funil</label>' +
+    '<select onchange="fecharModal();mudarStatusLead(\'' + esc(l.id) + '\',this.value)">' +
+    FUNIL.map(function (f) {
+      return '<option value="' + f[0] + '"' + (String(l.status || "novo") === f[0] ? " selected" : "") + ">" + f[1] + "</option>";
+    }).join("") + "</select></div>",
+    '<button class="btn btn-d" style="margin-right:auto" onclick="excluirLead(\'' + esc(l.id) + '\')">' +
+      ICON.trash + "Excluir</button>" +
+    '<button class="btn" onclick="contatoLead(\'' + esc(l.id) + '\')">WhatsApp</button>' +
+    '<button class="btn btn-p" onclick="fecharModal()">Fechar</button>', true);
+}
+/* abre a conversa já com o contexto do diagnóstico na mão */
+function contatoLead(id) {
+  var l = (LEADS.lista || []).filter(function (x) { return String(x.id) === String(id); })[0];
+  if (!l) return toast("Lead não encontrado.", "err");
+  var fone = dig(String(l.telefone || ""));
+  if (!fone) return toast("Este lead não deixou telefone. Use o e-mail: " + (l.email || "—"), "err");
+  if (fone.length <= 11) fone = "55" + fone;
+  var txt = "Olá, " + String(l.nome || "").split(" ")[0] +
+    "! Aqui é a Vyora. Recebemos o diagnóstico da " + (l.empresa || "sua empresa") +
+    " e separei uma leitura do que encontramos. Posso te mostrar?";
+  window.open("https://wa.me/" + fone + "?text=" + encodeURIComponent(txt), "_blank");
+}
+/* arrastar e soltar entre as colunas */
+function ligarArrasto() {
+  var cartoes = document.querySelectorAll(".kd");
+  for (var i = 0; i < cartoes.length; i++) {
+    cartoes[i].addEventListener("dragstart", function (e) {
+      LEADS.arrastando = this.getAttribute("data-id");
+      this.classList.add("indo");
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+    });
+    cartoes[i].addEventListener("dragend", function () {
+      LEADS.arrastando = null; this.classList.remove("indo");
+    });
+  }
+  var colunas = document.querySelectorAll(".kcol");
+  for (var c = 0; c < colunas.length; c++) {
+    colunas[c].addEventListener("dragover", function (e) { e.preventDefault(); this.classList.add("sobre"); });
+    colunas[c].addEventListener("dragleave", function () { this.classList.remove("sobre"); });
+    colunas[c].addEventListener("drop", function (e) {
+      e.preventDefault(); this.classList.remove("sobre");
+      var id = LEADS.arrastando, destino = this.getAttribute("data-col");
+      LEADS.arrastando = null;
+      if (id && destino) mudarStatusLead(id, destino);
+    });
+  }
 }
 function pintarLeads() {
   var alvo = el("lead-lista");
@@ -3717,35 +3833,26 @@ function pintarLeads() {
       '<button class="btn" onclick="carregarLeads()">Tentar de novo</button></div></div>';
     return;
   }
-  var l = LEADS.lista.slice();
-  if (LEADS.filtro) l = l.filter(function (x) { return String(x.status || "novo") === LEADS.filtro; });
+  var base = LEADS.lista.slice();
   if (LEADS.busca) {
     var t = LEADS.busca.toLowerCase();
-    l = l.filter(function (x) {
+    base = base.filter(function (x) {
       return ((x.empresa || "") + " " + (x.nome || "") + " " + (x.email || "") + " " + (x.telefone || "")).toLowerCase().indexOf(t) >= 0;
     });
   }
-  var cont = FUNIL.map(function (f) {
-    var n = LEADS.lista.filter(function (x) { return String(x.status || "novo") === f[0]; }).length;
-    return '<button class="seg-b' + (LEADS.filtro === f[0] ? " on" : "") + '" onclick="LEADS.filtro=\'' +
-      (LEADS.filtro === f[0] ? "" : f[0]) + '\';pintarLeads()">' + f[1] + " <b>" + n + "</b></button>";
-  }).join("");
-  alvo.innerHTML = '<div class="ld-fun">' + cont +
-    '<button class="seg-b' + (LEADS.filtro ? "" : " on") + '" onclick="LEADS.filtro=\'\';pintarLeads()">Todos <b>' +
-    LEADS.lista.length + "</b></button></div>" +
-    (l.length ? l.map(cardLead).join("")
-      : '<div class="box"><div class="box-b">' + vazio("Nenhum diagnóstico neste filtro",
-        "Quando alguém terminar o Diagnóstico Estratégico no site, ele aparece aqui em segundos.", "", "file") + "</div></div>");
-}
-function modalTrocarProjeto() {
-  var c = supaCfg();
-  modal("Projeto do Supabase",
-    nota("Só mexa aqui se você trocou de projeto. A chave <b>publishable</b> é pública; " +
-      "a chave secreta não deve ser usada em lugar nenhum.", "wr") +
-    '<div class="fld"><label>URL do projeto</label><input id="sb-url" value="' + esc(c.url) + '"></div>' +
-    '<div class="fld"><label>Chave publishable</label><input id="sb-key" value="' + esc(c.key) + '"></div>',
-    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
-    '<button class="btn btn-p" onclick="salvarSupabase()">Salvar</button>');
+  if (!LEADS.lista.length) {
+    alvo.innerHTML = '<div class="box"><div class="box-b">' + vazio("Nenhum diagnóstico ainda",
+      "Quando alguém terminar o Diagnóstico Estratégico no site, ele aparece aqui em segundos, na coluna Novo.", "", "file") + "</div></div>";
+    return;
+  }
+  alvo.innerHTML = '<div class="kan">' + FUNIL.map(function (f) {
+    var col = base.filter(function (x) { return String(x.status || "novo") === f[0]; });
+    return '<div class="kcol' + (f[0] === "ganho" ? " ok" : f[0] === "perdido" ? " off" : "") + '" data-col="' + f[0] + '">' +
+      '<div class="kcol-h"><b>' + f[1] + "</b><span>" + col.length + "</span></div>" +
+      '<div class="kcol-b">' + (col.length ? col.map(cartaoLead).join("")
+        : '<div class="kvazio">arraste um lead para cá</div>') + "</div></div>";
+  }).join("") + "</div>";
+  ligarArrasto();
 }
 function pg_leads() {
   var c = supaCfg();
@@ -3782,16 +3889,289 @@ function pg_leads() {
       '<div class="fld"><label>Senha</label><input id="sb-pass" type="password" autocomplete="current-password"></div>' +
       '<div id="sb-err" class="note ng hidden"></div>' +
       '<button class="btn btn-p" onclick="supaEntrar()">Entrar</button> ' +
-      '<button class="btn" onclick="modalTrocarProjeto()">Trocar projeto</button>' +
+      '<button class="btn" onclick="ir(\'leads\',{trocar:1})">Trocar projeto</button>' +
       "</div></div>";
   }
   setTimeout(carregarLeads, 0);
   var h = head("Leads do site", "Diagnósticos recebidos pelo site institucional",
     '<div class="srch" style="min-width:220px"><span class="i">' + ICON.search +
     '</span><input placeholder="Empresa, nome, telefone" oninput="LEADS.busca=this.value;pintarLeads()"></div>' +
-    '<button class="btn" onclick="carregarLeads()">Atualizar</button>' +
-    '<button class="btn" onclick="supaSair()">Sair do Supabase</button>');
+    '<button class="btn" onclick="carregarLeads()">Atualizar</button>');
   h += '<div id="lead-lista"><div class="box"><div class="box-b sm mut">Buscando os diagnósticos…</div></div></div>';
+  return h;
+}
+
+/* =======================================================================
+   ACESSOS NA NUVEM — etapa 1 da sincronização: identidade
+
+   Cada pessoa que vai usar a plataforma tem um usuário no Supabase.
+   Aqui você diz de qual empresa ela é e com qual papel. É esta tabela
+   que, nas próximas etapas, decide o que cada um consegue ler — não
+   mais o JavaScript do arquivo.
+   ======================================================================= */
+var PERFIS_NUVEM = { lista: [], carregando: false, erro: "" };
+var PAPEIS_NUVEM = [
+  ["vyora", "Equipe Vyora", "Administra a plataforma inteira"],
+  ["admin", "Administrador da empresa", "Toda a operação e o financeiro da empresa dele"],
+  ["vendedor", "Vendedor · PDV", "Só o comercial: venda, clientes e produtos"],
+  ["holding", "Gestor da rede", "Números consolidados do grupo, sem a operação"]
+];
+function rotuloPapel(k) {
+  var p = PAPEIS_NUVEM.filter(function (x) { return x[0] === k; })[0];
+  return p ? p[1] : k;
+}
+function carregarPerfisNuvem() {
+  if (!supaConfigurado() || !supaAutenticado()) return;
+  PERFIS_NUVEM.carregando = true; PERFIS_NUVEM.erro = "";
+  supaPedido("/rest/v1/perfis?select=*&order=criado_em.desc", { method: "GET" })
+    .then(function (r) {
+      if (r.status === 401 || r.status === 403) { SUPA_TOKEN = null; throw new Error("Sessão do Supabase expirou. Entre de novo pela tela de Leads."); }
+      if (r.status === 404) throw new Error("A tabela perfis ainda não existe. Rode o arquivo supabase-identidade.sql no SQL Editor.");
+      if (!r.ok) throw new Error("O Supabase respondeu " + r.status + ".");
+      return r.json();
+    })
+    .then(function (j) { PERFIS_NUVEM.lista = j || []; PERFIS_NUVEM.carregando = false; pintarAcessos(); })
+    .catch(function (e) { PERFIS_NUVEM.carregando = false; PERFIS_NUVEM.erro = e.message; pintarAcessos(); });
+}
+function modalVincularAcesso(uid) {
+  var p = uid ? PERFIS_NUVEM.lista.filter(function (x) { return x.user_id === uid; })[0] : null;
+  var empresas = srt(DB.tenants.filter(function (t) { return t.id !== "vyora"; }), function (t) { return t.nome; });
+  modal(p ? "Acesso de " + esc(p.nome) : "Vincular um acesso",
+    (p ? "" : nota("Antes de vincular, crie a pessoa no Supabase: <b>Authentication › Users › Add user</b>, " +
+      "com <b>Auto Confirm User</b> marcado. Depois cole aqui o <b>User UID</b> que aparece na lista.", "wr")) +
+    (p ? "" : '<div class="fld"><label>User UID <span class="rq">*</span></label>' +
+      '<input id="ac-uid" placeholder="00000000-0000-0000-0000-000000000000"></div>') +
+    '<div class="rw rw2"><div class="fld"><label>E-mail <span class="rq">*</span></label>' +
+      '<input id="ac-mail" value="' + esc(p ? p.email : "") + '"' + (p ? " disabled" : "") + "></div>" +
+    '<div class="fld"><label>Nome <span class="rq">*</span></label>' +
+      '<input id="ac-nome" value="' + esc(p ? p.nome : "") + '"></div></div>' +
+    '<div class="rw rw2"><div class="fld"><label>Empresa <span class="rq">*</span></label>' +
+      '<select id="ac-tenant"><option value="vyora"' + (p && p.tenant_id === "vyora" ? " selected" : "") + ">Vyora (equipe interna)</option>" +
+      empresas.map(function (t) {
+        return '<option value="' + esc(t.id) + '"' + (p && p.tenant_id === t.id ? " selected" : "") + ">" + esc(t.nome) + "</option>";
+      }).join("") + "</select></div>" +
+    '<div class="fld"><label>Papel <span class="rq">*</span></label><select id="ac-papel">' +
+      PAPEIS_NUVEM.map(function (x) {
+        return '<option value="' + x[0] + '"' + (p && p.perfil === x[0] ? " selected" : "") + ">" + x[1] + "</option>";
+      }).join("") + "</select></div></div>" +
+    '<div class="hp">' + PAPEIS_NUVEM.map(function (x) { return "<b>" + x[1] + ":</b> " + x[2]; }).join("<br>") + "</div>" +
+    '<div id="ac-err" class="note ng hidden"></div>',
+    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
+    '<button class="btn btn-p" onclick="salvarAcessoNuvem(' + (p ? "'" + esc(p.user_id) + "'" : "null") + ')">Salvar</button>');
+}
+function salvarAcessoNuvem(uid) {
+  var err = el("ac-err");
+  function bad(m) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); }
+  var nome = v("ac-nome"), tenant = v("ac-tenant"), papel = v("ac-papel");
+  if (nome.length < 2) return bad("Informe o nome da pessoa.");
+  if (!tenant) return bad("Escolha a empresa.");
+  var corpo = { nome: nome, tenant_id: tenant, perfil: papel };
+  if (uid) {
+    supaPedido("/rest/v1/perfis?user_id=eq." + encodeURIComponent(uid), {
+      method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(corpo)
+    }).then(function (r) {
+      if (!r.ok) return bad("O Supabase recusou a alteração (" + r.status + ").");
+      auditar("Acesso na nuvem alterado", nome, tenant + " · " + papel);
+      save(); fecharModal(); carregarPerfisNuvem(); toast("Acesso atualizado.", "ok");
+    }).catch(function () { bad("Sem resposta do Supabase."); });
+    return;
+  }
+  var id = String(v("ac-uid")).trim(), mail = String(v("ac-mail")).trim();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return bad("Cole o User UID exatamente como aparece no Supabase.");
+  if (mail.indexOf("@") < 0) return bad("Informe o e-mail da pessoa.");
+  corpo.user_id = id; corpo.email = mail;
+  supaPedido("/rest/v1/perfis", {
+    method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(corpo)
+  }).then(function (r) {
+    if (r.status === 409) return bad("Esta pessoa já está vinculada.");
+    if (!r.ok) return bad("O Supabase recusou o cadastro (" + r.status + "). Confira se o UID existe em Authentication › Users.");
+    auditar("Acesso na nuvem criado", nome, mail + " · " + tenant + " · " + papel);
+    save(); fecharModal(); carregarPerfisNuvem(); toast("Acesso vinculado.", "ok");
+  }).catch(function () { bad("Sem resposta do Supabase."); });
+}
+function alternarAcessoNuvem(uid, ativo) {
+  supaPedido("/rest/v1/perfis?user_id=eq." + encodeURIComponent(uid), {
+    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ativo: !!ativo })
+  }).then(function (r) {
+    if (!r.ok) return toast("Não foi possível mudar a situação.", "err");
+    auditar(ativo ? "Acesso na nuvem reativado" : "Acesso na nuvem suspenso", uid, "");
+    save(); carregarPerfisNuvem();
+    toast(ativo ? "Acesso liberado." : "Acesso suspenso — vale imediatamente.", "ok");
+  }).catch(function () { toast("Sem resposta do Supabase.", "err"); });
+}
+function nomeEmpresaId(tid) {
+  if (tid === "vyora") return "Vyora";
+  var t = find(DB.tenants, tid);
+  return t ? t.nome : tid;
+}
+/* ---------------- cópias das empresas ----------------
+   O cliente sabe que a cópia existe, mas não a alcança. Quem abre
+   e restaura é a Vyora — e a restauração escreve por cima só do
+   que estava na cópia, sem apagar o que veio depois. */
+var COPIAS_VYORA = { lista: [], carregando: false, erro: "" };
+function carregarCopiasVyora() {
+  if (!supaConfigurado() || !supaAutenticado()) return;
+  COPIAS_VYORA.carregando = true; COPIAS_VYORA.erro = "";
+  supaPedido("/rest/v1/backups?select=id,tenant_id,feito_em,itens&order=feito_em.desc&limit=40", { method: "GET" })
+    .then(function (r) {
+      if (r.status === 404) throw new Error("As cópias ainda não foram ligadas no servidor. Rode o supabase-etapa6-auditoria-backup.sql.");
+      if (!r.ok) throw new Error("O Supabase respondeu " + r.status + ".");
+      return r.json();
+    })
+    .then(function (j) { COPIAS_VYORA.lista = j || []; COPIAS_VYORA.carregando = false; pintarCopias(); })
+    .catch(function (e) { COPIAS_VYORA.carregando = false; COPIAS_VYORA.erro = e.message; pintarCopias(); });
+}
+function restaurarCopia(id, empresa, quando) {
+  confirmar("Restaurar a cópia de " + esc(empresa) + "?",
+    "Os registros da cópia de <b>" + esc(quando) + "</b> voltam a valer e descem para todos os aparelhos da empresa. " +
+    "O que foi criado depois da cópia permanece. Esta ação fica registrada.",
+    function () {
+      supaPedido("/rest/v1/rpc/restaurar_copia", { method: "POST", body: JSON.stringify({ copia: Number(id) }) })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (j === null) return toast("O servidor recusou a restauração.", "err");
+          auditar("Cópia restaurada", empresa, quando + " · " + j + " registros");
+          save(); toast(j + " registros restaurados.", "ok");
+        }).catch(function () { toast("Sem resposta do Supabase.", "err"); });
+    }, "Restaurar");
+}
+function pintarCopias() {
+  var alvo = el("cp-lista");
+  if (!alvo) return;
+  if (COPIAS_VYORA.carregando) { alvo.innerHTML = '<div class="sm mut">Consultando o Supabase…</div>'; return; }
+  if (COPIAS_VYORA.erro) { alvo.innerHTML = nota(esc(COPIAS_VYORA.erro), "ng"); return; }
+  if (!COPIAS_VYORA.lista.length) {
+    alvo.innerHTML = '<div class="sm mut">Nenhuma cópia guardada ainda. Elas aparecem sozinhas quando as empresas abrem o sistema.</div>';
+    return;
+  }
+  alvo.innerHTML = COPIAS_VYORA.lista.map(function (c) {
+    var nome = nomeEmpresaId(c.tenant_id), quando = fdt(c.feito_em);
+    return '<div class="ln"><span class="k"><b>' + esc(nome) + "</b> · " + quando + "</span>" +
+      '<span class="v sm">' + c.itens + " registros " +
+      '<button class="btn btn-s" style="margin-left:10px" onclick="restaurarCopia(' + c.id + ",'" +
+      esc(nome).replace(/'/g, "") + "','" + quando + "')\">Restaurar</button></span></div>";
+  }).join("");
+}
+
+/* ---------------- o mapa da rede no servidor ----------------
+   Quem é matriz de quem não pode ser decidido pelo navegador do
+   cliente. O console publica esse mapa; é ele que o servidor usa
+   para somar os números que o gestor da rede recebe. */
+function registrarEmpresaNuvem(t, depois) {
+  if (!supaConfigurado() || !supaAutenticado() || !t) return depois && depois(false);
+  supaPedido("/rest/v1/empresas", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      tenant_id: t.id, nome: t.nome, matriz_id: t.matriz_id || null,
+      ativo: t.status === "ativo"
+    })
+  }).then(function (r) { if (depois) depois(r.ok); })
+    .catch(function () { if (depois) depois(false); });
+}
+function publicarMapaDaRede() {
+  if (!supaConfigurado() || !supaAutenticado()) return toast("Entre na sua conta do Supabase pela tela de Leads.", "err");
+  var lista = DB.tenants.filter(function (t) { return t.id !== "vyora"; }).map(function (t) {
+    return { tenant_id: t.id, nome: t.nome, matriz_id: t.matriz_id || null, ativo: t.status === "ativo" };
+  });
+  if (!lista.length) return toast("Nenhuma empresa cadastrada ainda.", "err");
+  supaPedido("/rest/v1/empresas", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(lista)
+  }).then(function (r) {
+    if (!r.ok) return toast("O Supabase recusou o envio (" + r.status + ").", "err");
+    auditar("Mapa da rede publicado", lista.length + " empresa(s)", "");
+    save(); toast(lista.length + " empresa(s) no mapa do servidor.", "ok");
+  }).catch(function () { toast("Sem resposta do Supabase.", "err"); });
+}
+
+/* ---------------- acesso na nuvem criado sozinho ----------------
+   Ao provisionar a empresa, a conta de acesso do administrador dela
+   nasce no Supabase junto com o ambiente. Você não abre o painel. */
+function criarContaNuvemConsole(email, senha, tenantId, papel, nome, depois) {
+  var c = supaCfg();
+  if (typeof fetch !== "function" || !c.url || !c.key || !email || !senha) return depois && depois(false);
+  fetch(c.url + "/auth/v1/signup", {
+    method: "POST", headers: { apikey: c.key, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: String(email).trim().toLowerCase(), password: senha })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) {
+      var uid = x.j && (x.j.id || (x.j.user && x.j.user.id));
+      if (!uid) return depois && depois(false);
+      supaPedido("/rest/v1/perfis", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({
+          user_id: uid, email: String(email).toLowerCase(), nome: nome || email,
+          tenant_id: tenantId, perfil: papel, ativo: true
+        })
+      }).then(function (r) {
+        if (r.ok) auditar("Acesso na nuvem criado", email, tenantId + " · " + papel);
+        if (depois) depois(r.ok);
+      }).catch(function () { if (depois) depois(false); });
+    }).catch(function () { if (depois) depois(false); });
+}
+function pintarAcessos() {
+  var alvo = el("ac-lista");
+  if (!alvo) return;
+  if (PERFIS_NUVEM.carregando) { alvo.innerHTML = '<div class="box"><div class="box-b sm mut">Consultando o Supabase…</div></div>'; return; }
+  if (PERFIS_NUVEM.erro) {
+    alvo.innerHTML = '<div class="box"><div class="box-b">' + nota(esc(PERFIS_NUVEM.erro), "ng") +
+      '<button class="btn" onclick="carregarPerfisNuvem()">Tentar de novo</button></div></div>';
+    return;
+  }
+  if (!PERFIS_NUVEM.lista.length) {
+    alvo.innerHTML = '<div class="box"><div class="box-b">' + vazio("Nenhum acesso vinculado ainda",
+      "Crie a pessoa em Authentication › Users no Supabase e vincule aqui à empresa e ao papel dela.",
+      '<button class="btn btn-p btn-lg" onclick="modalVincularAcesso()">' + ICON.plus + "Vincular acesso</button>", "seguranca") + "</div></div>";
+    return;
+  }
+  var porEmpresa = {};
+  PERFIS_NUVEM.lista.forEach(function (p) { (porEmpresa[p.tenant_id] = porEmpresa[p.tenant_id] || []).push(p); });
+  alvo.innerHTML = Object.keys(porEmpresa).sort(function (a, b) {
+    return a === "vyora" ? -1 : b === "vyora" ? 1 : nomeEmpresaId(a).localeCompare(nomeEmpresaId(b));
+  }).map(function (tid) {
+    return box(nomeEmpresaId(tid), '<div class="box-b">' + porEmpresa[tid].map(function (p, i) {
+      return '<div class="ac-p"' + (i ? ' style="border-top:1px solid var(--line-2)"' : "") + ">" +
+        '<span class="av">' + ini2(p.nome) + "</span>" +
+        '<div style="flex:1;min-width:0"><b>' + esc(p.nome) + "</b>" +
+        '<div class="sm mut">' + esc(p.email) + " · " + esc(rotuloPapel(p.perfil)) + "</div></div>" +
+        '<span class="tag ' + (p.ativo ? "t-pos" : "t-mut") + '">' + (p.ativo ? "ativo" : "suspenso") + "</span>" +
+        '<button class="btn btn-s" onclick="modalVincularAcesso(\'' + esc(p.user_id) + '\')">Editar</button>' +
+        '<button class="btn btn-s' + (p.ativo ? " btn-d" : "") + '" onclick="alternarAcessoNuvem(\'' + esc(p.user_id) + "'," + (p.ativo ? "false" : "true") + ')">' +
+        (p.ativo ? "Suspender" : "Reativar") + "</button></div>";
+    }).join("") + "</div>", "", porEmpresa[tid].length + " acesso(s)");
+  }).join('<div style="height:14px"></div>');
+}
+function pg_acessos() {
+  if (!supaAutenticado()) {
+    return head("Acessos na nuvem", "Quem entra na plataforma, de qual empresa e com qual papel") +
+      '<div class="box"><div class="box-b">' +
+      nota("Entre primeiro na sua conta do Supabase — o console faz isso sozinho no login quando o e-mail e a senha são os mesmos. " +
+        "Se ainda não bateram, abra <b>Leads do site</b> e conecte uma vez.", "wr") +
+      '<button class="btn btn-p" onclick="ir(\'leads\')">Ir para Leads do site</button></div></div>';
+  }
+  setTimeout(carregarPerfisNuvem, 0);
+  var h = head("Acessos na nuvem", "Quem entra na plataforma, de qual empresa e com qual papel",
+    '<button class="btn" onclick="carregarPerfisNuvem()">Atualizar</button>' +
+    '<button class="btn btn-p" onclick="modalVincularAcesso()">' + ICON.plus + "Vincular acesso</button>");
+  h += nota("Esta é a base da sincronização: a partir daqui, quem decide o que cada pessoa enxerga é o " +
+    "servidor, não o arquivo. Suspender um acesso aqui corta o alcance <b>na hora</b>, em qualquer aparelho.", "");
+  h += '<div style="height:14px"></div>' +
+    box("Mapa da rede no servidor", '<div class="box-b">' +
+      '<div class="sm mut" style="margin-bottom:12px">É por este mapa que o servidor sabe quais empresas somar ' +
+      "para cada gestor de rede. Empresas novas entram sozinhas na liberação do ambiente; use o botão abaixo " +
+      "para publicar de uma vez as que já existiam.</div>" +
+      '<button class="btn" onclick="publicarMapaDaRede()">Publicar o mapa agora</button></div>');
+  setTimeout(carregarCopiasVyora, 0);
+  h += '<div style="height:14px"></div>' +
+    box("Cópias de segurança das empresas", '<div class="box-b">' +
+      '<div class="sm mut" style="margin-bottom:12px">O servidor guarda uma cópia por dia de cada empresa. ' +
+      "O cliente vê que ela existe, mas não consegue abrir nem apagar — restaurar é sempre uma decisão da Vyora.</div>" +
+      '<div id="cp-lista"><div class="sm mut">Consultando o Supabase…</div></div>' +
+      '<button class="btn" style="margin-top:14px" onclick="carregarCopiasVyora()">Atualizar</button></div>');
+  h += '<div style="height:14px"></div><div id="ac-lista"><div class="box"><div class="box-b sm mut">Consultando o Supabase…</div></div></div>';
   return h;
 }
 

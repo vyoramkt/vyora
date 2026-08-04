@@ -533,11 +533,6 @@ body.tour-on{overflow:hidden}
         <button class="btn btn-p btn-lg" onclick="validarToken()" id="tk-btn">Continuar</button>
       </div>
       <div class="tk-hint" id="tk-hint">Formato: VY seguido de 8 caracteres.</div>
-      <div class="tk-hint" style="margin-top:16px">Primeiro acesso neste computador?
-        <button type="button" onclick="modalPrimeiroAcesso()"
-                style="background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--brand);cursor:pointer;text-decoration:underline">
-          Baixar o meu ambiente</button>
-      </div>
     </div>
 
     <!-- etapa 2: quem está usando -->
@@ -557,6 +552,8 @@ body.tour-on{overflow:hidden}
       <div class="org-card" id="user-card"></div>
       <form onsubmit="event.preventDefault();doLogin()">
         <input id="lg-mail" type="hidden">
+        <div class="fld hidden" id="lg-mail-box"><label>E-mail</label>
+          <input id="lg-mail-in" type="email" autocomplete="username" placeholder="voce@suaempresa.com.br"></div>
         <div class="fld"><label>Senha</label><input id="lg-pass" type="password" autocomplete="current-password" placeholder="••••••"></div>
         <div id="lg-err" class="note ng hidden"></div>
         <button class="btn btn-p btn-lg" style="width:100%" type="submit">Entrar</button>
@@ -1645,16 +1642,16 @@ function renderLogin() {
     var pend = DB.users.filter(function (u) { return credencialPendente(u); })[0];
     if (pend) {
       /* nada de e-mail de ninguém nesta tela: ela é a porta da rua */
-      hint.innerHTML = "Primeiro acesso: use o token da sua empresa e o e-mail que a Vyora enviou junto com ele. " +
-        "A senha temporária será trocada por você assim que entrar.";
+      hint.innerHTML = "Primeiro acesso: use o token da sua empresa. A senha temporária que a Vyora enviou " +
+        "será trocada por você assim que entrar.";
       hint.style.color = "var(--ink-3)";
       mostrarEtapa("token");
       return;
     }
   }
   if (!DB.tenants.length) {
-    hint.innerHTML = "Nenhum ambiente foi liberado neste computador ainda. Se você já usa o sistema, baixe o seu ambiente no link abaixo. " +
-      "Se ainda não tem acesso, ele é criado pela Vyora na contratação da licença.";
+    hint.innerHTML = "Informe o token da sua empresa. Se este computador for novo, o sistema traz o ambiente sozinho " +
+      "quando você entrar com o seu acesso. O token é criado pela Vyora na contratação da licença.";
     hint.style.color = "var(--ink-3)";
   }
   mostrarEtapa("token");
@@ -1675,7 +1672,11 @@ function mostrarEtapa(qual) {
   if (qual === "token") setTimeout(function () { var e = el("tk-in"); if (e && e.focus) e.focus(); }, 60);
   if (qual === "login") setTimeout(function () { var e = el("lg-pass"); if (e && e.focus) e.focus(); }, 60);
 }
-function trocarToken() { window.__env = null; renderLogin(); }
+function trocarToken() {
+  window.__env = null; window.__token_novo = null;
+  if (el("lg-mail-box")) el("lg-mail-box").classList.add("hidden");
+  renderLogin();
+}
 function validarToken() {
   var tk = v("tk-in"), inp = el("tk-in"), hint = el("tk-hint"), btn = el("tk-btn");
   if (dig(tk.replace(/[^A-Z0-9]/gi, "")).length === 0 && tk.length < 12) {
@@ -1689,7 +1690,13 @@ function validarToken() {
       qual = conferirToken(DB.tenants[i], tk);
       if (qual) t = DB.tenants[i];
     }
-    if (!t) { inp.classList.add("err"); hint.textContent = "Token não reconhecido. Confira com a equipe Vyora."; hint.style.color = "var(--danger)"; return; }
+    /* token que este computador ainda não conhece não é erro: pode ser
+       simplesmente a primeira vez aqui. Quem confere é o servidor, na
+       hora em que a pessoa informar o próprio acesso. */
+    if (!t) {
+      if (podeNuvem()) { hint.textContent = "Formato: VY seguido de 8 caracteres."; hint.style.color = ""; return pedirAcessoDoAmbiente(tk); }
+      inp.classList.add("err"); hint.textContent = "Token não reconhecido. Confira com a equipe Vyora."; hint.style.color = "var(--danger)"; return;
+    }
     if (t.status !== "ativo") { inp.classList.add("err"); hint.textContent = "Ambiente suspenso. Fale com a Vyora para regularizar."; hint.style.color = "var(--danger)"; return; }
     window.__env = t.id;
     window.__token_antigo = qual === "anterior";
@@ -1718,9 +1725,27 @@ function renderLoginUsers() {
       '<span class="av">' + ini2(u.nome) + "</span><b>" + esc(u.nome) + "</b><span>" + PERFIS[u.perfil].nome + "</span></button>";
   }).join("") || '<div class="sm mut">Nenhum usuário ativo neste ambiente.</div>';
 }
+/* o computador não tem este ambiente: pede o acesso da pessoa e o
+   servidor resolve o resto. Nenhum botão, nenhum download à parte. */
+function pedirAcessoDoAmbiente(tk) {
+  window.__env = null;
+  window.__token_novo = tk;
+  el("lg-mail").value = ""; el("lg-mail-in").value = ""; el("lg-pass").value = "";
+  el("lg-mail-box").classList.remove("hidden");
+  el("lg-err").classList.add("hidden");
+  el("lg-ola").textContent = "Entrar com o seu acesso";
+  el("user-card").innerHTML =
+    '<span class="org-logo" style="width:44px;height:44px;border-radius:14px;font-size:15px">VY</span>' +
+    "<div><b>Este computador ainda não tem o ambiente</b>" +
+    "<span>entre com o seu e-mail e senha de sempre — o resto é automático</span></div>" +
+    '<button type="button" class="sw" onclick="trocarToken()">trocar</button>';
+  mostrarEtapa("login");
+}
 function escolherPerfil(id) {
   var u = find(DB.users, id);
   if (!u) return;
+  window.__token_novo = null;
+  el("lg-mail-box").classList.add("hidden");
   el("lg-mail").value = u.email;
   el("lg-pass").value = "";
   el("lg-err").classList.add("hidden");
@@ -1730,6 +1755,8 @@ function escolherPerfil(id) {
   mostrarEtapa("login");
 }
 function doLogin() {
+  /* ambiente ainda não instalado aqui: o mesmo formulário resolve */
+  if (window.__token_novo) return entrarComAmbienteNovo();
   var mail = v("lg-mail").toLowerCase(), pass = v("lg-pass"), err = el("lg-err");
   function bad(m) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); }
   var u = DB.users.filter(function (x) { return x.tenant_id === window.__env && x.email.toLowerCase() === mail; })[0];
@@ -6714,63 +6741,47 @@ function baixarAmbiente(depois) {
   });
 }
 
-/* ---------------- primeiro acesso num computador novo ----------------
-   Trazer o ambiente para um computador novo pede as DUAS coisas:
-   o acesso da pessoa (e-mail e senha) e o token da empresa. Senha
-   vazada sozinha não abre nada — continua faltando o token, que é
-   da empresa e não fica escrito em lugar nenhum na internet. */
-function modalPrimeiroAcesso() {
-  modal("Primeiro acesso neste aparelho",
-    nota("Para trazer o ambiente da sua empresa para este computador, você precisa do <b>token da empresa</b> " +
-      "e do <b>seu e-mail e senha</b>. Uma coisa sem a outra não abre.", "inf") +
-    '<div class="fld"><label>Token da empresa <span class="rq">*</span></label>' +
-    '<input id="pa-token" maxlength="14" placeholder="VY-XXXX-XXXX" autocomplete="off" spellcheck="false" ' +
-    'oninput="this.value=this.value.toUpperCase()"></div>' +
-    '<div class="fld"><label>E-mail <span class="rq">*</span></label>' +
-    '<input id="pa-mail" type="email" autocomplete="username" placeholder="voce@suaempresa.com.br"></div>' +
-    '<div class="fld"><label>Senha <span class="rq">*</span></label>' +
-    '<input id="pa-senha" type="password" autocomplete="current-password"></div>' +
-    '<div id="pa-err" class="note ng hidden"></div>' +
-    '<div class="hp">Se este computador não é seu, saia da conta ao terminar. ' +
-    "O sistema não guarda a sua senha em lugar nenhum, e a entrada fica registrada para o administrador da empresa.</div>",
-    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
-    '<button class="btn btn-p" id="pa-btn" onclick="baixarMeuAmbiente()">Baixar o meu ambiente</button>');
-}
-function baixarMeuAmbiente() {
-  var err = el("pa-err"), btn = el("pa-btn");
-  function bad(m) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); btn.disabled = false; btn.textContent = "Baixar o meu ambiente"; }
-  var tk = String(v("pa-token")).trim().toUpperCase();
-  var mail = String(v("pa-mail")).trim().toLowerCase(), senha = v("pa-senha");
-  if (tk.replace(/[^A-Z0-9]/g, "").length < 10) return bad("Informe o token completo da empresa. Ele foi entregue pela Vyora junto com o acesso.");
+/* ---------------- entrar num computador que ainda não tem o ambiente ----
+   A pessoa não faz nada diferente: informa o token, o e-mail e a senha,
+   como sempre. O ambiente vem junto, por baixo. As duas chaves continuam
+   valendo — token da empresa e acesso da pessoa —, e o token é conferido
+   no servidor, não aqui. Senha vazada sozinha não abre nada. */
+function entrarComAmbienteNovo() {
+  var err = el("lg-err");
+  function bad(m) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); }
+  var tk = window.__token_novo;
+  var mail = String(v("lg-mail-in")).trim().toLowerCase(), pass = v("lg-pass");
   if (mail.indexOf("@") < 0) return bad("Informe o seu e-mail.");
-  if (!senha) return bad("Informe a sua senha.");
-  btn.disabled = true; btn.textContent = "Buscando…";
-  conectarNuvem(mail, senha, function (ok) {
-    if (!ok) return bad("Não reconhecemos este e-mail e senha, ou o seu acesso ainda não foi liberado. Fale com o administrador da sua empresa.");
+  if (!pass) return bad("Informe a sua senha.");
+  err.innerHTML = "<span></span><div>Entrando…</div>"; err.classList.remove("hidden");
+  conectarNuvem(mail, pass, function (ok) {
+    if (!ok) return bad("E-mail ou senha não conferem, ou o seu acesso ainda não foi liberado. Fale com o administrador da sua empresa.");
     buscarAmbienteNuvem(tk, function (pac) {
       if (!pac || !pac.tenant) {
         nuvemEsquecer();
-        return bad("Não foi possível trazer o ambiente. Ou o token não confere com a sua empresa, " +
-          "ou o administrador ainda não abriu o sistema nenhuma vez para publicá-lo.");
+        return bad("Este token não pertence à empresa do seu acesso. Confira o token com quem administra o sistema.");
       }
       instalarAmbiente(pac);
       var u = DB.users.filter(function (x) { return x.email && x.email.toLowerCase() === mail; })[0];
-      if (!u) {
-        nuvemEsquecer();
-        return bad("O ambiente foi encontrado, mas o seu usuário não está na equipe desta empresa.");
-      }
-      protegerSenha(u, senha);
+      if (!u) { nuvemEsquecer(); return bad("O seu usuário não faz parte da equipe desta empresa."); }
+      protegerSenha(u, pass);
       delete u.senha_pela_nuvem;
       u.status = u.status || "ativo";
-      save();
-      fecharModal();
       window.__env = u.tenant_id;
-      toast("Ambiente instalado neste aparelho.", "ok");
+      window.__token_novo = null;
+      el("lg-mail-box").classList.add("hidden");
+      err.classList.add("hidden");
+      save();
+      logar("Ambiente aberto em um computador novo", u.nome + " · " + String(navigator.userAgent || "").substring(0, 60));
       Sess = marcarSessao({ tenant_id: u.tenant_id, user_id: u.id });
-      Store.set(SKEY, JSON.stringify(Sess));
-      logar("Ambiente baixado em novo aparelho", u.nome + " · " + (navigator.userAgent || "").substring(0, 60));
-      save(); iniciarApp();
-      contarFila(); pintarSync(); lacoSync();
+      SYNC.tenant = u.tenant_id;
+      SYNC.ligado = true; SYNC.estado = "ligado";
+      /* traz a operação inteira ANTES de abrir a tela: a pessoa entra
+         e encontra os clientes, as vendas e o caixa no lugar */
+      baixarNovidades(function () {
+        entrarComUsuario(u, mail, pass);
+        lacoSync();
+      });
     });
   });
 }

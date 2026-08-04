@@ -2312,6 +2312,8 @@ function provisionar(t, senhaEscolhida) {
   }
   /* e o servidor passa a saber quem é esta empresa e de qual rede */
   registrarEmpresaNuvem(t);
+  /* o ambiente vai junto: o cliente entra do computador dele no mesmo dia */
+  publicarAmbienteConsole(t);
   gerarFaturas(t);
   var im = implantacaoDe(t.id) || (DB.implantacoes.push(novaImplantacao(t, false)), implantacaoDe(t.id));
   im.etapa = "implantacao";
@@ -4053,6 +4055,52 @@ function pintarCopias() {
   }).join("");
 }
 
+/* ---------------- o ambiente publicado na liberação ----------------
+   O cliente precisa conseguir entrar do computador dele, que nunca
+   viu este sistema. Para isso o ambiente tem que existir no servidor
+   ANTES do primeiro acesso — e quem tem esses dados na mão, na hora
+   de liberar a empresa, é o console. Senha nenhuma vai no pacote. */
+var SEGREDOS_AMB = ["senha", "senha_hash", "salt", "senha_em", "provisoria", "tentativas", "bloqueio_ate", "bloqueado_ate", "acesso"];
+function semSegredosConsole(u) {
+  var c = {};
+  for (var k in u) if (u.hasOwnProperty(k) && SEGREDOS_AMB.indexOf(k) < 0) c[k] = u[k];
+  return c;
+}
+function pacoteAmbienteConsole(t) {
+  if (!t) return null;
+  return {
+    tenant: t,
+    config: DB.config.filter(function (x) { return x.tenant_id === t.id; })[0] || null,
+    users: DB.users.filter(function (u) { return u.tenant_id === t.id; }).map(semSegredosConsole)
+  };
+}
+function publicarAmbienteConsole(t, depois) {
+  if (!supaConfigurado() || !supaAutenticado() || !t) return depois && depois(false);
+  var p = pacoteAmbienteConsole(t);
+  if (!p) return depois && depois(false);
+  supaPedido("/rest/v1/ambientes", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ tenant_id: t.id, dados: p })
+  }).then(function (r) { if (depois) depois(r.ok); })
+    .catch(function () { if (depois) depois(false); });
+}
+function publicarAmbientesTodos() {
+  if (!supaConfigurado() || !supaAutenticado()) return toast("Entre na sua conta do Supabase pela tela de Leads.", "err");
+  var lista = DB.tenants.filter(function (t) { return t.id !== "vyora" && t.provisionado; });
+  if (!lista.length) return toast("Nenhuma empresa liberada ainda.", "err");
+  var corpo = lista.map(function (t) { return { tenant_id: t.id, dados: pacoteAmbienteConsole(t) }; });
+  supaPedido("/rest/v1/ambientes", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(corpo)
+  }).then(function (r) {
+    if (!r.ok) return toast("O Supabase recusou o envio (" + r.status + ").", "err");
+    auditar("Ambientes publicados", lista.length + " empresa(s)", "");
+    save(); toast(lista.length + " ambiente(s) prontos para o primeiro acesso.", "ok");
+  }).catch(function () { toast("Sem resposta do Supabase.", "err"); });
+}
+
 /* ---------------- o mapa da rede no servidor ----------------
    Quem é matriz de quem não pode ser decidido pelo navegador do
    cliente. O console publica esse mapa; é ele que o servidor usa
@@ -4164,6 +4212,12 @@ function pg_acessos() {
       "para cada gestor de rede. Empresas novas entram sozinhas na liberação do ambiente; use o botão abaixo " +
       "para publicar de uma vez as que já existiam.</div>" +
       '<button class="btn" onclick="publicarMapaDaRede()">Publicar o mapa agora</button></div>');
+  h += '<div style="height:14px"></div>' +
+    box("Ambientes prontos para o primeiro acesso", '<div class="box-b">' +
+      '<div class="sm mut" style="margin-bottom:12px">Para o cliente entrar do computador dele, o ambiente da empresa ' +
+      "precisa existir no servidor. Empresas liberadas de agora em diante já saem publicadas; use o botão abaixo " +
+      "para as que foram liberadas antes.</div>" +
+      '<button class="btn" onclick="publicarAmbientesTodos()">Publicar os ambientes agora</button></div>');
   setTimeout(carregarCopiasVyora, 0);
   h += '<div style="height:14px"></div>' +
     box("Cópias de segurança das empresas", '<div class="box-b">' +

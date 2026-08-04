@@ -6759,7 +6759,8 @@ function entrarComAmbienteNovo() {
     buscarAmbienteNuvem(tk, function (pac) {
       if (!pac || !pac.tenant) {
         nuvemEsquecer();
-        return bad("Este token não pertence à empresa do seu acesso. Confira o token com quem administra o sistema.");
+        return bad("Não conseguimos abrir este ambiente. Confira o token com quem administra o sistema — " +
+          "e, se ele estiver certo, avise a Vyora que o ambiente da empresa ainda não foi publicado.");
       }
       instalarAmbiente(pac);
       var u = DB.users.filter(function (x) { return x.email && x.email.toLowerCase() === mail; })[0];

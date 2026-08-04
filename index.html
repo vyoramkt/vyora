@@ -6692,46 +6692,73 @@ function instalarAmbiente(p) {
   });
   return true;
 }
+/* busca o pacote sem instalar nada.
+   O servidor só entrega se o token da empresa vier junto e conferir —
+   a checagem é lá, não aqui: token errado, nada trafega. */
+function buscarAmbienteNuvem(token, depois) {
+  if (!nuvemViva() || !token) return depois && depois(null);
+  nuvemPedido("/rest/v1/rpc/meu_ambiente", {
+    method: "POST", body: JSON.stringify({ token: String(token).toUpperCase() })
+  }).then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) { depois && depois(j && j.tenant ? j : null); })
+    .catch(function () { if (depois) depois(null); });
+}
 function baixarAmbiente(depois) {
-  if (!nuvemViva()) return depois && depois(false);
-  nuvemPedido("/rest/v1/ambientes?select=dados,atualizado_em&limit=1", { method: "GET" })
-    .then(function (r) { return r.ok ? r.json() : []; })
-    .then(function (l) {
-      var linha = (l || [])[0];
-      if (!linha || !linha.dados) return depois && depois(false);
-      var mudou = instalarAmbiente(linha.dados);
-      if (mudou) save();
-      if (depois) depois(mudou);
-    }).catch(function () { if (depois) depois(false); });
+  var t = find(DB.tenants, T());
+  if (!t || !t.token) return depois && depois(false);
+  buscarAmbienteNuvem(t.token, function (pac) {
+    if (!pac) return depois && depois(false);
+    var mudou = instalarAmbiente(pac);
+    if (mudou) save();
+    if (depois) depois(mudou);
+  });
 }
 
-/* ---------------- primeiro acesso num computador novo ---------------- */
+/* ---------------- primeiro acesso num computador novo ----------------
+   Trazer o ambiente para um computador novo pede as DUAS coisas:
+   o acesso da pessoa (e-mail e senha) e o token da empresa. Senha
+   vazada sozinha não abre nada — continua faltando o token, que é
+   da empresa e não fica escrito em lugar nenhum na internet. */
 function modalPrimeiroAcesso() {
   modal("Primeiro acesso neste aparelho",
-    nota("Entre com o <b>mesmo e-mail e a mesma senha</b> que você já usa no sistema. " +
-      "O ambiente da sua empresa é baixado para este computador e o acesso segue normalmente.", "inf") +
+    nota("Para trazer o ambiente da sua empresa para este computador, você precisa do <b>token da empresa</b> " +
+      "e do <b>seu e-mail e senha</b>. Uma coisa sem a outra não abre.", "inf") +
+    '<div class="fld"><label>Token da empresa <span class="rq">*</span></label>' +
+    '<input id="pa-token" maxlength="14" placeholder="VY-XXXX-XXXX" autocomplete="off" spellcheck="false" ' +
+    'oninput="this.value=this.value.toUpperCase()"></div>' +
     '<div class="fld"><label>E-mail <span class="rq">*</span></label>' +
     '<input id="pa-mail" type="email" autocomplete="username" placeholder="voce@suaempresa.com.br"></div>' +
     '<div class="fld"><label>Senha <span class="rq">*</span></label>' +
     '<input id="pa-senha" type="password" autocomplete="current-password"></div>' +
     '<div id="pa-err" class="note ng hidden"></div>' +
     '<div class="hp">Se este computador não é seu, saia da conta ao terminar. ' +
-    "O sistema não guarda a sua senha em lugar nenhum.</div>",
+    "O sistema não guarda a sua senha em lugar nenhum, e a entrada fica registrada para o administrador da empresa.</div>",
     '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
     '<button class="btn btn-p" id="pa-btn" onclick="baixarMeuAmbiente()">Baixar o meu ambiente</button>');
 }
 function baixarMeuAmbiente() {
   var err = el("pa-err"), btn = el("pa-btn");
   function bad(m) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); btn.disabled = false; btn.textContent = "Baixar o meu ambiente"; }
+  var tk = String(v("pa-token")).trim().toUpperCase();
   var mail = String(v("pa-mail")).trim().toLowerCase(), senha = v("pa-senha");
+  if (tk.replace(/[^A-Z0-9]/g, "").length < 10) return bad("Informe o token completo da empresa. Ele foi entregue pela Vyora junto com o acesso.");
   if (mail.indexOf("@") < 0) return bad("Informe o seu e-mail.");
   if (!senha) return bad("Informe a sua senha.");
   btn.disabled = true; btn.textContent = "Buscando…";
   conectarNuvem(mail, senha, function (ok) {
     if (!ok) return bad("Não reconhecemos este e-mail e senha, ou o seu acesso ainda não foi liberado. Fale com o administrador da sua empresa.");
-    baixarAmbiente(function () {
+    buscarAmbienteNuvem(tk, function (pac) {
+      if (!pac || !pac.tenant) {
+        nuvemEsquecer();
+        return bad("Não foi possível trazer o ambiente. Ou o token não confere com a sua empresa, " +
+          "ou o administrador ainda não abriu o sistema nenhuma vez para publicá-lo.");
+      }
+      instalarAmbiente(pac);
       var u = DB.users.filter(function (x) { return x.email && x.email.toLowerCase() === mail; })[0];
-      if (!u) return bad("O seu acesso existe na nuvem, mas o ambiente da empresa ainda não foi publicado. Peça ao administrador para abrir o sistema uma vez.");
+      if (!u) {
+        nuvemEsquecer();
+        return bad("O ambiente foi encontrado, mas o seu usuário não está na equipe desta empresa.");
+      }
       protegerSenha(u, senha);
       delete u.senha_pela_nuvem;
       u.status = u.status || "ativo";
@@ -6741,7 +6768,7 @@ function baixarMeuAmbiente() {
       toast("Ambiente instalado neste aparelho.", "ok");
       Sess = marcarSessao({ tenant_id: u.tenant_id, user_id: u.id });
       Store.set(SKEY, JSON.stringify(Sess));
-      logar("Ambiente baixado em novo aparelho", u.nome);
+      logar("Ambiente baixado em novo aparelho", u.nome + " · " + (navigator.userAgent || "").substring(0, 60));
       save(); iniciarApp();
       contarFila(); pintarSync(); lacoSync();
     });

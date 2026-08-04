@@ -5639,7 +5639,10 @@ function conectarNuvem(mail, senha, depois) {
     body: JSON.stringify({ email: String(mail).trim(), password: senha })
   }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
     .then(function (x) {
-      if (!x.ok || !x.j.access_token) { SYNC.estado = "sem-conta"; return depois && depois(false); }
+      if (!x.ok || !x.j.access_token) {
+        SYNC.estado = "sem-conta";
+        return depois && depois(false, (x.j && (x.j.error_description || x.j.msg || x.j.message)) || "");
+      }
       nuvemGuardar(x.j, mail);
       confirmarPerfilNuvem(depois);
     }).catch(function () { SYNC.estado = "offline"; if (depois) depois(false); });
@@ -6773,8 +6776,13 @@ function entrarComAmbienteNovo() {
   if (mail.indexOf("@") < 0) return bad("Informe o seu e-mail.");
   if (!pass) return bad("Informe a sua senha.");
   err.innerHTML = "<span></span><div>Entrando…</div>"; err.classList.remove("hidden");
-  conectarNuvem(mail, pass, function (ok) {
-    if (!ok) return bad("E-mail ou senha não conferem, ou o seu acesso ainda não foi liberado. Fale com o administrador da sua empresa.");
+  conectarNuvem(mail, pass, function (ok, motivo) {
+    if (!ok) {
+      if (String(motivo || "").toLowerCase().indexOf("not confirmed") >= 0) {
+        return bad("Este acesso existe, mas está esperando uma confirmação por e-mail que a Vyora precisa desligar. Avise a Vyora — é um ajuste rápido.");
+      }
+      return bad("E-mail ou senha não conferem, ou o seu acesso ainda não foi liberado. Fale com o administrador da sua empresa.");
+    }
     buscarAmbienteNuvem(tk, function (pac) {
       if (!pac || !pac.tenant) {
         nuvemEsquecer();

@@ -4174,16 +4174,32 @@ function publicarMapaDaRede() {
 /* ---------------- acesso na nuvem criado sozinho ----------------
    Ao provisionar a empresa, a conta de acesso do administrador dela
    nasce no Supabase junto com o ambiente. Você não abre o painel. */
+var senhaNaoTrocou = "";
 function criarContaNuvemConsole(email, senha, tenantId, papel, nome, depois) {
   var c = supaCfg();
-  if (typeof fetch !== "function" || !c.url || !c.key || !email || !senha) return depois && depois(false);
+  function fim(ok, motivo) { if (depois) depois(ok, motivo); if (!ok && motivo) toast(motivo, "err"); }
+  if (typeof fetch !== "function" || !c.url || !c.key) return fim(false, "O projeto do Supabase não está configurado — o acesso na nuvem não foi criado.");
+  if (!supaAutenticado()) return fim(false, "O console não está conectado ao servidor — o acesso na nuvem não foi criado. Abra Acessos na nuvem e entre.");
+  if (!email || !senha) return fim(false, "Faltou e-mail ou senha para criar o acesso na nuvem.");
   fetch(c.url + "/auth/v1/signup", {
     method: "POST", headers: { apikey: c.key, "Content-Type": "application/json" },
     body: JSON.stringify({ email: String(email).trim().toLowerCase(), password: senha })
   }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
     .then(function (x) {
       var uid = x.j && (x.j.id || (x.j.user && x.j.user.id));
-      if (!uid) return depois && depois(false);
+      if (!uid) {
+        var m = (x.j && (x.j.msg || x.j.error_description || x.j.message)) || "o servidor recusou";
+        return fim(false, "Não foi possível criar o acesso de " + email + " na nuvem: " + m);
+      }
+      /* o servidor responde igual para conta nova e conta que já existe —
+         a diferença é a lista de identidades vazia. Nesse caso a senha NÃO
+         muda, e dizer que deu tudo certo seria mentira. */
+      var ident = (x.j.user && x.j.user.identities) || x.j.identities;
+      if (Array.isArray(ident) && ident.length === 0) {
+        senhaNaoTrocou = email;
+        toast("O acesso de " + email + " já existia na nuvem com outra senha. " +
+          "A senha temporária nova NÃO vale para ele — veja o aviso na tela.", "err");
+      }
       supaPedido("/rest/v1/perfis", {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -4192,10 +4208,36 @@ function criarContaNuvemConsole(email, senha, tenantId, papel, nome, depois) {
           tenant_id: tenantId, perfil: papel, ativo: true
         })
       }).then(function (r) {
-        if (r.ok) auditar("Acesso na nuvem criado", email, tenantId + " · " + papel);
-        if (depois) depois(r.ok);
-      }).catch(function () { if (depois) depois(false); });
-    }).catch(function () { if (depois) depois(false); });
+        if (!r.ok) return fim(false, "A conta de " + email + " foi criada, mas não ficou vinculada à empresa (" + r.status + ").");
+        auditar("Acesso na nuvem criado", email, tenantId + " · " + papel);
+        fim(true);
+      }).catch(function () { fim(false, "Sem resposta do servidor ao vincular o acesso de " + email + "."); });
+    }).catch(function () { fim(false, "Sem resposta do servidor ao criar o acesso de " + email + "."); });
+}
+/* conserta o que ficou pelo caminho: empresa liberada sem acesso na
+   nuvem, porque o console estava desconectado naquele momento */
+function criarAcessosQueFaltam() {
+  if (!supaConfigurado() || !supaAutenticado()) return toast("Conecte a sua conta do Supabase nesta tela primeiro.", "err");
+  var vinculados = {};
+  (PERFIS_NUVEM.lista || []).forEach(function (p) { vinculados[String(p.email || "").toLowerCase()] = true; });
+  var faltando = [];
+  DB.tenants.filter(function (t) { return t.id !== "vyora" && t.provisionado; }).forEach(function (t) {
+    DB.users.filter(function (u) { return u.tenant_id === t.id; }).forEach(function (u) {
+      var senha = u.provisoria || t.senha_provisoria;
+      if (!vinculados[String(u.email || "").toLowerCase()] && senha) faltando.push({ u: u, t: t, senha: senha });
+    });
+  });
+  if (!faltando.length) return toast("Todos os acessos já existem na nuvem.", "ok");
+  var feitos = 0, i = 0;
+  (function proximo() {
+    if (i >= faltando.length) {
+      carregarPerfisNuvem();
+      return toast(feitos + " de " + faltando.length + " acesso(s) criados.", feitos ? "ok" : "err");
+    }
+    var x = faltando[i++];
+    criarContaNuvemConsole(x.u.email, x.senha, x.t.id, x.u.perfil === "holding" ? "holding" : x.u.perfil === "admin" ? "admin" : "vendedor",
+      x.u.nome, function (ok) { if (ok) feitos++; proximo(); });
+  })();
 }
 function pintarAcessos() {
   var alvo = el("ac-lista");
@@ -4258,6 +4300,16 @@ function pg_acessos() {
     '<button class="btn btn-p" onclick="carregarPerfisNuvem()">Atualizar</button>');
   h += nota("Esta é a base da sincronização: a partir daqui, quem decide o que cada pessoa enxerga é o " +
     "servidor, não o arquivo. Suspender um acesso aqui corta o alcance <b>na hora</b>, em qualquer aparelho.", "");
+  if (senhaNaoTrocou) {
+    h += '<div style="height:14px"></div>' +
+      nota("<b>Atenção: a senha de " + esc(senhaNaoTrocou) + " não foi trocada.</b><br>" +
+        "A conta dessa pessoa já existia no servidor, e por segurança o servidor não deixa ninguém " +
+        "redefinir a senha de outro por aqui — nem a Vyora. Gerar uma senha temporária nova no console " +
+        "muda só o lado de cá; do lado do servidor continua valendo a senha antiga.<br><br>" +
+        "<b>Para resolver:</b> abra o Supabase em <b>Authentication › Users</b>, apague esse usuário, " +
+        "volte aqui e clique em <b>Criar os acessos que faltam</b>. A conta nasce de novo com a senha " +
+        "temporária que está no console.", "wr");
+  }
   h += '<div style="height:14px"></div>' +
     box("Mapa da rede no servidor", '<div class="box-b">' +
       '<div class="sm mut" style="margin-bottom:12px">É por este mapa que o servidor sabe quais empresas somar ' +
@@ -4269,7 +4321,8 @@ function pg_acessos() {
       '<div class="sm mut" style="margin-bottom:12px">Para o cliente entrar do computador dele, o ambiente da empresa ' +
       "precisa existir no servidor. Empresas liberadas de agora em diante já saem publicadas; use o botão abaixo " +
       "para as que foram liberadas antes.</div>" +
-      '<button class="btn" onclick="publicarAmbientesTodos()">Publicar os ambientes agora</button></div>');
+      '<button class="btn" onclick="publicarAmbientesTodos()">Publicar os ambientes agora</button>' +
+      '<button class="btn" style="margin-left:8px" onclick="criarAcessosQueFaltam()">Criar os acessos que faltam</button></div>');
   setTimeout(carregarCopiasVyora, 0);
   h += '<div style="height:14px"></div>' +
     box("Cópias de segurança das empresas", '<div class="box-b">' +

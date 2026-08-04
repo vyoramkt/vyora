@@ -1440,6 +1440,7 @@ function doLogin() {
   /* mesma credencial do console abre os leads: se a conta existir no Supabase
      com este e-mail e senha, conecta em silêncio e nunca mais pergunta */
   if (!sessaoSupaGuardada()) conectarLeadsComLogin(mail, senha);
+  else religarSupabase(function (ok) { if (!ok) conectarLeadsComLogin(mail, senha); });
   err.classList.add("hidden");
   iniciar();
   if (u.trocar_senha) trocaObrigatoria();
@@ -1493,6 +1494,11 @@ function iniciar() {
   el("app").style.display = "block";
   el("seal").innerHTML = marcaVyora(20) + '<div><b>Vyora</b><span>Console interno</span></div>';
   montarUsuario(); montarMenu();
+  /* a conexão com o servidor volta aqui, uma vez, para o console inteiro.
+     Assim nenhuma tela precisa pedir login de novo — nem Leads, nem Acessos. */
+  if (!supaAutenticado() && sessaoSupaGuardada()) {
+    religarSupabase(function (ok) { if (ok && View.pg) ir(View.pg, View.p); });
+  }
   ir("exec");
 }
 function montarUsuario() {
@@ -3628,7 +3634,7 @@ function esquecerSessaoSupa() { try { Store.del(SUPA_SESS); } catch (e) {} }
 function sessaoSupaGuardada() {
   try { return JSON.parse(Store.get(SUPA_SESS) || "null"); } catch (e) { return null; }
 }
-function supaEntrar() {
+function supaEntrar(volta) {
   var c = supaCfg(), err = el("sb-err");
   function bad(m) { if (err) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); } }
   var mail = String(v("sb-mail")).trim(), senha = v("sb-pass");
@@ -3641,7 +3647,7 @@ function supaEntrar() {
     .then(function (x) {
       if (!x.ok || !x.j.access_token) return bad(x.j.error_description || x.j.msg || "Não foi possível entrar. Confira o e-mail e a senha.");
       guardarSessaoSupa(x.j, mail);
-      ir("leads");
+      ir(volta || "leads");
     }).catch(function () { bad("Sem resposta do Supabase. Verifique a URL do projeto e a sua internet."); });
 }
 /* o login do console vale para os leads: mesma conta, mesma senha.
@@ -3945,11 +3951,20 @@ function rotuloPapel(k) {
   return p ? p[1] : k;
 }
 function carregarPerfisNuvem() {
-  if (!supaConfigurado() || !supaAutenticado()) return;
+  if (!supaConfigurado()) { PERFIS_NUVEM.erro = "O projeto do Supabase ainda não foi configurado."; return pintarAcessos(); }
+  if (!supaAutenticado()) {
+    /* a sessão pode ter expirado enquanto a tela estava aberta */
+    return religarSupabase(function (ok) {
+      if (ok) return carregarPerfisNuvem();
+      PERFIS_NUVEM.carregando = false;
+      PERFIS_NUVEM.erro = "A conexão com o servidor expirou. Entre de novo com a sua conta do Supabase.";
+      pintarAcessos();
+    });
+  }
   PERFIS_NUVEM.carregando = true; PERFIS_NUVEM.erro = "";
   supaPedido("/rest/v1/perfis?select=*&order=criado_em.desc", { method: "GET" })
     .then(function (r) {
-      if (r.status === 401 || r.status === 403) { SUPA_TOKEN = null; throw new Error("Sessão do Supabase expirou. Entre de novo pela tela de Leads."); }
+      if (r.status === 401 || r.status === 403) { SUPA_TOKEN = null; throw new Error("A conexão com o servidor expirou. Recarregue a página para entrar de novo."); }
       if (r.status === 404) throw new Error("A tabela perfis ainda não existe. Rode o arquivo supabase-identidade.sql no SQL Editor.");
       if (!r.ok) throw new Error("O Supabase respondeu " + r.status + ".");
       return r.json();
@@ -4108,7 +4123,7 @@ function publicarAmbienteConsole(t, depois) {
     .catch(function () { if (depois) depois(false); });
 }
 function publicarAmbientesTodos() {
-  if (!supaConfigurado() || !supaAutenticado()) return toast("Entre na sua conta do Supabase pela tela de Leads.", "err");
+  if (!supaConfigurado() || !supaAutenticado()) return toast("Conecte a sua conta do Supabase nesta tela primeiro.", "err");
   var lista = DB.tenants.filter(function (t) { return t.id !== "vyora" && t.provisionado; });
   if (!lista.length) return toast("Nenhuma empresa liberada ainda.", "err");
   var corpo = lista.map(function (t) { return { tenant_id: t.id, dados: pacoteAmbienteConsole(t) }; });
@@ -4140,7 +4155,7 @@ function registrarEmpresaNuvem(t, depois) {
     .catch(function () { if (depois) depois(false); });
 }
 function publicarMapaDaRede() {
-  if (!supaConfigurado() || !supaAutenticado()) return toast("Entre na sua conta do Supabase pela tela de Leads.", "err");
+  if (!supaConfigurado() || !supaAutenticado()) return toast("Conecte a sua conta do Supabase nesta tela primeiro.", "err");
   var lista = DB.tenants.filter(function (t) { return t.id !== "vyora"; }).map(function (t) {
     return { tenant_id: t.id, nome: t.nome, matriz_id: t.matriz_id || null, ativo: t.status === "ativo" };
   });
@@ -4192,9 +4207,10 @@ function pintarAcessos() {
     return;
   }
   if (!PERFIS_NUVEM.lista.length) {
-    alvo.innerHTML = '<div class="box"><div class="box-b">' + vazio("Nenhum acesso vinculado ainda",
-      "Crie a pessoa em Authentication › Users no Supabase e vincule aqui à empresa e ao papel dela.",
-      '<button class="btn btn-p btn-lg" onclick="modalVincularAcesso()">' + ICON.plus + "Vincular acesso</button>", "seguranca") + "</div></div>";
+    alvo.innerHTML = '<div class="box"><div class="box-b">' + vazio("Nenhum acesso na nuvem ainda",
+      "Os acessos nascem sozinhos: quando você libera uma empresa aqui, ou quando o administrador dela cria " +
+      "um login para a equipe. Esta tela é onde você confere quem tem acesso e suspende quem precisar.",
+      "", "seguranca") + "</div></div>";
     return;
   }
   var porEmpresa = {};
@@ -4216,16 +4232,30 @@ function pintarAcessos() {
 }
 function pg_acessos() {
   if (!supaAutenticado()) {
-    return head("Acessos na nuvem", "Quem entra na plataforma, de qual empresa e com qual papel") +
-      '<div class="box"><div class="box-b">' +
-      nota("Entre primeiro na sua conta do Supabase — o console faz isso sozinho no login quando o e-mail e a senha são os mesmos. " +
-        "Se ainda não bateram, abra <b>Leads do site</b> e conecte uma vez.", "wr") +
-      '<button class="btn btn-p" onclick="ir(\'leads\')">Ir para Leads do site</button></div></div>';
+    /* sessão guardada neste computador: religa sozinha e volta para cá */
+    if (sessaoSupaGuardada()) {
+      setTimeout(function () {
+        religarSupabase(function (ok) {
+          if (ok) ir("acessos");
+          else if (el("ac-religando")) el("ac-religando").hidden = true;
+        });
+      }, 0);
+    }
+    return head("Acessos na nuvem", "Entre com a sua conta do Supabase para administrar os acessos") +
+      (sessaoSupaGuardada() ? '<div class="box" id="ac-religando"><div class="box-b sm mut">Reconectando com a sua sessão salva…</div></div>' : "") +
+      '<div class="box" style="max-width:520px"><div class="box-b">' +
+      nota("Quando a sua conta do Supabase usa <b>o mesmo e-mail e a mesma senha</b> do console, ele conecta " +
+        "sozinho no login e esta tela não aparece mais. Enquanto forem diferentes, entre uma vez aqui: " +
+        "a sessão fica guardada neste computador e se renova sozinha.", "") +
+      '<div class="fld"><label>E-mail da conta Supabase</label><input id="sb-mail" autocomplete="username" value="' + esc(SUPA_USER) + '"></div>' +
+      '<div class="fld"><label>Senha</label><input id="sb-pass" type="password" autocomplete="current-password"></div>' +
+      '<div id="sb-err" class="note ng hidden"></div>' +
+      '<button class="btn btn-p" onclick="supaEntrar(\'acessos\')">Entrar</button>' +
+      "</div></div>";
   }
   setTimeout(carregarPerfisNuvem, 0);
   var h = head("Acessos na nuvem", "Quem entra na plataforma, de qual empresa e com qual papel",
-    '<button class="btn" onclick="carregarPerfisNuvem()">Atualizar</button>' +
-    '<button class="btn btn-p" onclick="modalVincularAcesso()">' + ICON.plus + "Vincular acesso</button>");
+    '<button class="btn btn-p" onclick="carregarPerfisNuvem()">Atualizar</button>');
   h += nota("Esta é a base da sincronização: a partir daqui, quem decide o que cada pessoa enxerga é o " +
     "servidor, não o arquivo. Suspender um acesso aqui corta o alcance <b>na hora</b>, em qualquer aparelho.", "");
   h += '<div style="height:14px"></div>' +

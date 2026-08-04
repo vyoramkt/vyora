@@ -1644,8 +1644,9 @@ function renderLogin() {
   if (DB.tenants.length) {
     var pend = DB.users.filter(function (u) { return credencialPendente(u); })[0];
     if (pend) {
-      hint.innerHTML = "Primeiro acesso: use o token da sua empresa e o e-mail <b>" + esc(pend.email) +
-        "</b>. A senha temporária foi enviada pela Vyora e será trocada por você no primeiro login.";
+      /* nada de e-mail de ninguém nesta tela: ela é a porta da rua */
+      hint.innerHTML = "Primeiro acesso: use o token da sua empresa e o e-mail que a Vyora enviou junto com ele. " +
+        "A senha temporária será trocada por você assim que entrar.";
       hint.style.color = "var(--ink-3)";
       mostrarEtapa("token");
       return;

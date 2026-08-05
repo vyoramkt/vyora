@@ -5284,12 +5284,22 @@ function salvarUsuario(id) {
     DB.users.push(novoU);
     logar("Usuário criado", nome);
     /* o acesso na nuvem nasce junto: ninguém precisa abrir o Supabase */
-    criarContaNuvem(mail, provisoria, novoU.perfil);
+    criarContaNuvem(mail, provisoria, novoU.perfil, function (ok, motivo) {
+      if (ok) {
+        publicarAmbiente();
+        return toast("Acesso criado aqui e no servidor.", "ok");
+      }
+      toast("O login vale neste computador, mas NÃO no servidor" + (motivo ? " — " + motivo : "") +
+        ". A pessoa não vai conseguir entrar de outro aparelho.", "err");
+    });
     save(); fecharModal();
+    /* a lista precisa se redesenhar ANTES da janela de credencial, senão a
+       pessoa fecha a janela e não vê o usuário que acabou de criar */
+    ir("config", { tab: "equipe" });
     modalCredencialUsuario(novoU.id);
     return;
   }
-  save(); fecharModal();
+  save(); publicarAmbiente(); fecharModal();
   if (id === Sess.user_id) { montarUsuario(); montarMenu(); }
   ir("config", { tab: "equipe" });
 }
@@ -5298,7 +5308,7 @@ function toggleUser(id) {
   if (u.perfil === "admin" && u.status === "ativo" && DB.users.filter(function (x) { return x.tenant_id === T() && x.perfil === "admin" && x.status === "ativo"; }).length < 2) { toast("A empresa precisa de um administrador ativo.", "er"); return; }
   u.status = u.status === "ativo" ? "inativo" : "ativo";
   logar("Usuário " + (u.status === "ativo" ? "ativado" : "desativado"), u.nome);
-  save(); toast("Usuário " + (u.status === "ativo" ? "ativado" : "desativado") + ".", "ok"); ir("config", { tab: "equipe" });
+  save(); publicarAmbiente(); toast("Usuário " + (u.status === "ativo" ? "ativado" : "desativado") + ".", "ok"); ir("config", { tab: "equipe" });
 }
 function modalCredencialUsuario(id) {
   var u = find(DB.users, id), t = org();
@@ -5857,19 +5867,34 @@ save = function () {
    Supabase. Se a nuvem estiver fora do ar, o login local funciona
    igual e a conta é criada na próxima vez que der certo. */
 function criarContaNuvem(email, senha, papel, depois) {
-  if (!podeNuvem() || !email || !senha) return depois && depois(false);
+  function fim(ok, motivo) { if (depois) depois(ok, motivo); }
+  if (!podeNuvem()) return fim(false, "este navegador não consegue falar com o servidor");
+  if (!nuvemViva()) return fim(false, "o seu acesso ao servidor não está ativo agora");
+  if (!email || !senha) return fim(false, "faltou e-mail ou senha");
   fetch(SUPA_URL + "/auth/v1/signup", {
     method: "POST", headers: { apikey: SUPA_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ email: String(email).trim().toLowerCase(), password: senha })
   }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
     .then(function (x) {
-      var uid = x.j && (x.j.id || (x.j.user && x.j.user.id));
-      if (!uid) {
-        /* e-mail já existe na nuvem: só falta o vínculo, que vem abaixo */
-        return vincularPerfilNuvem(null, email, papel, depois);
+      var novo = x.j && (x.j.id || (x.j.user && x.j.user.id));
+      if (!novo) {
+        return fim(false, (x.j && (x.j.msg || x.j.error_description || x.j.message)) || "o servidor recusou a criação");
       }
-      vincularPerfilNuvem(uid, email, papel, depois);
-    }).catch(function () { if (depois) depois(false); });
+      /* conta que já existia volta com a lista de identidades vazia — e
+         nesse caso a senha NÃO mudou. Quem alinha é a função do servidor. */
+      var ident = (x.j.user && x.j.user.identities) || x.j.identities;
+      if (Array.isArray(ident) && ident.length === 0) {
+        return vincularPerfilNuvem(novo, email, papel, function (okV) {
+          redefinirSenhaNuvem(email, senha, function (okS, porque) {
+            if (okS) return fim(okV, okV ? "" : "não consegui vincular à empresa");
+            fim(false, "esse e-mail já tinha acesso com outra senha e não consegui trocá-la" + (porque ? " (" + porque + ")" : ""));
+          });
+        });
+      }
+      vincularPerfilNuvem(novo, email, papel, function (okV) {
+        fim(okV, okV ? "" : "a conta foi criada mas não ficou vinculada à empresa");
+      });
+    }).catch(function () { fim(false, "sem resposta do servidor"); });
 }
 function vincularPerfilNuvem(uid, email, papel, depois) {
   if (!uid) return depois && depois(false);

@@ -1816,6 +1816,8 @@ function salvarTrocaObrigatoria() {
   if (nuvemViva()) trocarSenhaNuvem(nova);
   else criarContaNuvem(u.email, nova, u.perfil, function (ok) { if (ok) conectarNuvem(u.email, nova); });
   save(); fecharModal(); toast("Senha definida. Bom trabalho.", "ok");
+  /* agora sim: a apresentação do sistema, com a tela livre */
+  tourDeBoasVindas();
 }
 function sair() {
   nuvemEsquecer();
@@ -6567,7 +6569,17 @@ function posicionarCartao(r, largura) {
 /* boas-vindas: uma vez por pessoa, no primeiro acesso */
 function tourDeBoasVindas() {
   if (!me() || tourVisto("inicio")) return;
-  setTimeout(function () { if (!Tour.chave) abrirTour("inicio"); }, 700);
+  /* nada de tour por cima de uma janela aberta — e muito menos por cima
+     da troca de senha do primeiro acesso, que é o que a pessoa precisa
+     resolver antes de qualquer outra coisa */
+  if (me().trocar_senha) return;
+  if (typeof MDS !== "undefined" && MDS.length) return;
+  setTimeout(function () {
+    if (Tour.chave) return;
+    if (me() && me().trocar_senha) return;
+    if (typeof MDS !== "undefined" && MDS.length) return;
+    abrirTour("inicio");
+  }, 700);
 }
 
 

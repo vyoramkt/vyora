@@ -1745,7 +1745,21 @@ function validarToken() {
       '<button type="button" class="sw" onclick="trocarToken()">trocar</button>';
     renderLoginUsers();
     mostrarEtapa("perfil");
+    /* a equipe pode ter mudado em outro computador: busca no servidor e
+       redesenha a lista, para ninguém ficar de fora do próprio acesso */
+    atualizarEquipeDoAmbiente();
   }, 420);
+}
+function atualizarEquipeDoAmbiente() {
+  var t = find(DB.tenants, window.__env);
+  if (!t || !t.token || !podeNuvem() || !nuvemSessao()) return;
+  religarNuvem(function (ok) {
+    if (!ok) return;
+    buscarAmbienteNuvem(t.token, function (pac) {
+      if (!pac) return;
+      if (instalarAmbiente(pac)) { save(); if (el("lg-perfis")) renderLoginUsers(); }
+    });
+  });
 }
 function logoHTML(t, size, radius) {
   var st = "width:" + size + "px;height:" + size + "px;border-radius:" + (radius || 11) + "px";
@@ -1843,17 +1857,17 @@ function salvarTrocaObrigatoria() {
   if (msg) return bad(msg);
   if (v("ts-a") !== v("ts-b")) return bad("A confirmação não confere.");
   var nova = v("ts-a");
-  protegerSenha(u, nova);
-  u.trocar_senha = false;
   logar("Senha definida no primeiro acesso", u.nome);
-  /* a nuvem acompanha a mesma senha — sincronização não fica para trás */
-  if (nuvemViva()) trocarSenhaNuvem(nova);
-  else criarContaNuvem(u.email, nova, u.perfil, function (ok) { if (ok) conectarNuvem(u.email, nova); });
-  save(); fecharModal(); toast("Senha definida. Bom trabalho.", "ok");
+  trocarSenhaNosDoisLados(u, nova, function (ok) {
+    if (ok) return toast("Senha definida. Bom trabalho.", "ok");
+    toast("Senha definida neste computador. Ainda não consegui avisar o servidor — vou tentar de novo sozinho.", "wr");
+  });
+  fecharModal();
   /* agora sim: a apresentação do sistema, com a tela livre */
   tourDeBoasVindas();
 }
 function sair() {
+  try { Store.del(K_TELA); } catch (e) {}
   nuvemEsquecer();
   Store.del(SKEY); Sess = null;
   el("app").style.display = "none"; el("login").classList.remove("hidden");
@@ -1883,13 +1897,27 @@ function iniciarApp() {
   el("login").classList.add("hidden");
   el("app").style.display = "block";
   aplicarMarca(); montarMenu(); montarUsuario(); montarSuporte(); avisoSuporteVyora();
-  ir(isVend() ? "pdv" : "dashboard");
+  ir(telaGuardada() || (isVend() ? "pdv" : "dashboard"), telaGuardadaP());
   pulso();
   contarFila(); pintarSync();
   if (nuvemSessao()) religarNuvem(function () {});
   lacoSync();
   tourDeBoasVindas();
 }
+/* onde a pessoa estava antes de recarregar — só vale se ela ainda
+   tiver permissão para aquela tela */
+function _telaGuardada() {
+  try {
+    var x = JSON.parse(Store.get(K_TELA) || "null");
+    if (!x || !x.pg) return null;
+    if (typeof window["pg_" + x.pg] !== "function") return null;
+    if (x.pg !== "assinatura" && !podeVer(x.pg)) return null;
+    return x;
+  } catch (e) { return null; }
+}
+function telaGuardada() { var x = _telaGuardada(); return x ? x.pg : null; }
+function telaGuardadaP() { var x = _telaGuardada(); return x ? x.p : null; }
+
 /* transparência: se a Vyora estiver dentro do ambiente, a empresa vê */
 function acessoVyoraAtivo() {
   var r = Store.get(SKEY);
@@ -2005,8 +2033,12 @@ var TITULOS = {
   rede_alertas: ["Alertas", "Sinais que exigem atenção da rede"],
   assinatura: ["Licença e manutenção", "Licença vitalícia e taxa mensal"]
 };
+var K_TELA = "vyora_tela";
 function ir(pg, p) {
   View.pg = pg; View.p = p || {};
+  /* recarregar a página não pode ser um castigo: o sistema volta onde
+     a pessoa estava, não no começo */
+  try { Store.set(K_TELA, JSON.stringify({ pg: pg, p: View.p })); } catch (e) {}
   _tourBotaoFeito = false;
   if (Tour.chave) fecharTour(false);
   el("nav").classList.remove("open");
@@ -5390,9 +5422,10 @@ function salvarPerfil() {
     var fr = senhaFraca(v("pf-b"), u.nome, u.email);
     if (fr) { err.textContent = fr; err.classList.remove("hidden"); return; }
     if (v("pf-b") !== v("pf-c")) { err.textContent = "A confirmação não confere."; err.classList.remove("hidden"); return; }
-    protegerSenha(u, v("pf-b"));
-    u.trocar_senha = false;
     logar("Senha alterada", u.nome);
+    trocarSenhaNosDoisLados(u, v("pf-b"), function (ok) {
+      if (!ok) toast("Senha trocada aqui. Ainda não consegui avisar o servidor — vou tentar de novo sozinho.", "wr");
+    });
   }
   u.nome = v("pf-nome"); u.email = v("pf-mail").toLowerCase();
   save(); fecharModal(); montarUsuario(); toast("Perfil atualizado.", "ok");
@@ -6782,7 +6815,7 @@ semEmpresas = function (titulo) {
    O AMBIENTE EM QUALQUER APARELHO
    ======================================================================= */
 var K_AMB = "vyora_ambiente_espelho";
-var CAMPOS_SEGREDO = ["senha", "senha_hash", "salt", "senha_em", "provisoria", "tentativas", "bloqueio_ate", "bloqueado_ate", "acesso"];
+var CAMPOS_SEGREDO = ["senha", "senha_hash", "salt", "senha_em", "provisoria", "senha_nova_guardada", "senha_nuvem_pendente", "tentativas", "bloqueio_ate", "bloqueado_ate", "acesso"];
 
 function semSegredos(u) {
   var c = {};
@@ -6913,6 +6946,11 @@ function entrarComAmbienteNovo() {
    a nuvem confirma e o aparelho se acerta sozinho */
 function senhaPelaNuvem(u, senha, ok, nao) {
   if (!podeNuvem() || !u || !u.email) return nao();
+  /* TRANCA IMPORTANTE: se sabemos que o servidor ainda está com a senha
+     ANTIGA (a troca daqui não chegou lá), aceitar o que ele diz seria
+     ressuscitar a senha temporária que já foi substituída. Nesse caso a
+     palavra final é a daqui, e seguimos tentando alinhar o servidor. */
+  if (u.senha_nuvem_pendente) { alinharSenhaPendente(u); return nao(); }
   conectarNuvem(u.email, senha, function (deu) {
     if (!deu) return nao();
     protegerSenha(u, senha);
@@ -6921,15 +6959,45 @@ function senhaPelaNuvem(u, senha, ok, nao) {
     ok();
   });
 }
+/* a troca de senha só termina quando vale nos dois lados. Enquanto não
+   valer, fica pendente e o sistema tenta de novo a cada sincronização. */
+function trocarSenhaNosDoisLados(u, nova, depois) {
+  protegerSenha(u, nova);
+  u.trocar_senha = false;
+  u.senha_nuvem_pendente = true;
+  u.senha_nova_guardada = nova;
+  save();
+  trocarSenhaNuvem(nova, function (ok) {
+    if (ok) {
+      delete u.senha_nuvem_pendente;
+      delete u.senha_nova_guardada;
+      save();
+    }
+    if (depois) depois(ok);
+  });
+}
+function alinharSenhaPendente(u) {
+  if (!u || !u.senha_nuvem_pendente || !u.senha_nova_guardada || !nuvemViva()) return;
+  trocarSenhaNuvem(u.senha_nova_guardada, function (ok) {
+    if (!ok) return;
+    delete u.senha_nuvem_pendente;
+    delete u.senha_nova_guardada;
+    save();
+  });
+}
 
 /* ---------------- o ambiente se mantém em dia ---------------- */
 var _ambienteEm = 0;
 function cuidarDoAmbiente() {
   if (!SYNC.ligado || !nuvemViva()) return;
-  if (Date.now() - _ambienteEm < 300000) return;
+  if (Date.now() - _ambienteEm < 120000) return;
   _ambienteEm = Date.now();
-  if (["admin", "holding"].indexOf(SYNC.perfil) >= 0) publicarAmbiente();
-  else baixarAmbiente();
+  /* baixa SEMPRE primeiro, inclusive quem é administrador. Sem isso, dois
+     computadores da mesma empresa publicam por cima um do outro e nenhum
+     dos dois fica sabendo da equipe que o outro cadastrou. */
+  baixarAmbiente(function () {
+    if (["admin", "holding"].indexOf(SYNC.perfil) >= 0) publicarAmbiente();
+  });
 }
 var _sincronizarSemAmbiente = sincronizar;
 sincronizar = function (depois) {
@@ -7073,6 +7141,7 @@ function corpoCopias() {
 var _cuidarSemCopia = cuidarDoAmbiente;
 cuidarDoAmbiente = function () {
   _cuidarSemCopia();
+  if (typeof me === "function" && me()) alinharSenhaPendente(me());
   if (copiasDisponiveis() && !COPIAS.feita) garantirCopiaDoDia();
 };
 (function () {

@@ -452,10 +452,21 @@ function marcaVyora(size, arrowColor) {
 var KEY = "vyora_db_v3", SKEY = "vyora_sess_v3", mem = {};
 var Store = {
   get: function (k) { try { var x = localStorage.getItem(k); return x === null ? (k in mem ? mem[k] : null) : x; } catch (e) { return k in mem ? mem[k] : null; } },
-  set: function (k, x) { mem[k] = x; try { localStorage.setItem(k, x); } catch (e) {} },
+  /* devolve false quando o navegador recusa gravar — o console também
+     não pode perder trabalho em silêncio */
+  set: function (k, x) { mem[k] = x; try { localStorage.setItem(k, x); return true; } catch (e) { return false; } },
   del: function (k) { delete mem[k]; try { localStorage.removeItem(k); } catch (e) {} }
 };
-function save() { Store.set(KEY, JSON.stringify(DB)); }
+var GRAVACAO_FALHOU = false;
+function save() {
+  var deu = Store.set(KEY, JSON.stringify(DB));
+  if (!deu && !GRAVACAO_FALHOU) {
+    GRAVACAO_FALHOU = true;
+    try { toast("O navegador recusou gravar — o espaço acabou. O que você fizer agora não será guardado.", "err"); } catch (e) {}
+  }
+  if (deu) GRAVACAO_FALHOU = false;
+  return deu;
+}
 function load() { var r = Store.get(KEY); if (r) { try { var d = JSON.parse(r); if (d && d.v === 3) { DB = d; return true; } } catch (e) {} } return false; }
 var _n = 0;
 function uid(p) { _n++; return p + Date.now().toString(36) + _n.toString(36) + Math.floor(Math.random() * 1e4).toString(36); }

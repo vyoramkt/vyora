@@ -682,11 +682,45 @@ function marcaVyora(size, arrowColor) {
 var KEY = "vyora_db_v3", SKEY = "vyora_sess_v3", mem = {};
 var Store = {
   get: function (k) { try { var x = localStorage.getItem(k); return x === null ? (k in mem ? mem[k] : null) : x; } catch (e) { return k in mem ? mem[k] : null; } },
-  set: function (k, x) { mem[k] = x; try { localStorage.setItem(k, x); } catch (e) {} },
+  /* devolve false quando o navegador recusa gravar — normalmente porque o
+     espaço acabou. Quem chama precisa saber: sem isso, a pessoa trabalha a
+     tarde inteira e perde tudo ao fechar a aba. */
+  set: function (k, x) { mem[k] = x; try { localStorage.setItem(k, x); return true; } catch (e) { return false; } },
   del: function (k) { delete mem[k]; try { localStorage.removeItem(k); } catch (e) {} }
 };
 var DB = null, Sess = null;
-function save() { Store.set(KEY, JSON.stringify(DB)); }
+var GRAVACAO_FALHOU = false;
+function save() {
+  var deu = Store.set(KEY, JSON.stringify(DB));
+  if (!deu && !GRAVACAO_FALHOU) { GRAVACAO_FALHOU = true; avisarGravacaoFalhou(); }
+  if (deu && GRAVACAO_FALHOU) { GRAVACAO_FALHOU = false; var b = el("bar-espaco"); if (b) b.remove(); }
+  return deu;
+}
+/* aviso que não sai da tela: é perda de dado, não um detalhe */
+function avisarGravacaoFalhou() {
+  try {
+    var b = el("bar-espaco");
+    if (!b) {
+      b = document.createElement("div");
+      b.id = "bar-espaco";
+      b.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#7f1d1d;color:#fff;" +
+        "padding:12px 18px;font:600 13px system-ui;line-height:1.5;text-align:center";
+      document.body.appendChild(b);
+    }
+    b.innerHTML = "Não foi possível gravar neste computador — o espaço do navegador acabou. " +
+      "O que você fizer agora <b>não será guardado</b>. Fale com a Vyora antes de continuar.";
+  } catch (e) {}
+}
+function espacoUsado() {
+  var total = 0;
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      total += (k.length + String(localStorage.getItem(k) || "").length) * 2;
+    }
+  } catch (e) {}
+  return total;
+}
 function load() { var r = Store.get(KEY); if (r) { try { var d = JSON.parse(r); if (d && d.v === 3) { DB = d; return true; } } catch (e) {} } return false; }
 
 /* ---------- utilitários ---------- */
@@ -5630,7 +5664,14 @@ function espelho() { try { return JSON.parse(Store.get(K_ESPELHO) || "{}"); } ca
 function gravarEspelho(e) { Store.set(K_ESPELHO, JSON.stringify(e)); }
 function relogio() { try { return JSON.parse(Store.get(K_RELOGIO) || "{}"); } catch (e) { return {}; } }
 function gravarRelogio(r) { Store.set(K_RELOGIO, JSON.stringify(r)); }
-function assinatura(o) { return JSON.stringify(o); }
+/* impressão digital curta do registro. Guardar o registro inteiro no espelho
+   dobrava o tamanho do banco dentro do navegador e era o caminho mais rápido
+   para estourar o espaço — que falha em silêncio e faz perder trabalho. */
+function assinatura(o) {
+  var t = JSON.stringify(o), h = 5381;
+  for (var i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0;
+  return t.length.toString(36) + "." + h.toString(36);
+}
 
 /* ---------------- sessão na nuvem ---------------- */
 function nuvemGuardar(j, mail) {
@@ -5853,12 +5894,13 @@ function lacoSync() {
 /* toda gravação local agenda uma subida — sem travar a tela */
 var _saveLocal = save, _syncAgendado = null;
 save = function () {
-  _saveLocal();
+  var deu = _saveLocal();
   marcarAtividade();
   contarFila(); pintarSync();
-  if (!SYNC.ligado) return;
+  if (!SYNC.ligado) return deu;
   if (_syncAgendado) clearTimeout(_syncAgendado);
   _syncAgendado = setTimeout(function () { enviarPendentes(); }, 1500);
+  return deu;
 };
 
 /* ---------------- acesso na nuvem criado sozinho ----------------
@@ -6761,7 +6803,7 @@ function publicarAmbiente(depois) {
   if (["admin", "holding"].indexOf(SYNC.perfil) < 0) return depois && depois(false);
   var p = pacoteAmbiente();
   if (!p) return depois && depois(false);
-  var a = JSON.stringify(p);
+  var a = assinatura(p);
   if (Store.get(K_AMB) === a) return depois && depois(true);
   nuvemPedido("/rest/v1/ambientes", {
     method: "POST",
@@ -6985,7 +7027,11 @@ function corpoCopias() {
   if (!REGISTRO.lista.length && !REGISTRO.carregando && !REGISTRO.erro) setTimeout(carregarRegistroNuvem, 0);
 
   var atual = COPIAS.ultima ? Math.floor((Date.now() - new Date(COPIAS.ultima).getTime()) / 86400000) : null;
-  var h = '<div class="grid c3" style="margin-bottom:18px">' +
+  var mb = espacoUsado() / 1048576;
+  var h = mb > 3.5 ? nota("Este computador já usa <b>" + mb.toFixed(1) + " MB</b> do espaço que o navegador reserva " +
+    "para o sistema (o limite costuma ser 5 MB). Perto do limite, o navegador passa a recusar gravações. " +
+    "Fale com a Vyora antes de chegar lá.", mb > 4.5 ? "ng" : "wr") + '<div style="height:14px"></div>' : "";
+  h += '<div class="grid c3" style="margin-bottom:18px">' +
     metric("Última cópia no servidor",
       COPIAS.ultima ? (atual <= 0 ? "hoje" : atual + " dia(s) atrás") : "—",
       COPIAS.ultima ? fdt(COPIAS.ultima) : "ainda não houve", atual !== null && atual > 2 ? "wr" : "pos") +

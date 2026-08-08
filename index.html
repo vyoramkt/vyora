@@ -625,6 +625,7 @@ function svg(d, sw) { return '<svg viewBox="0 0 24 24" fill="none" stroke="curre
 var ICON = {
   dashboard: svg('<rect x="3.2" y="3.2" width="7.4" height="8.6" rx="2.2"/><rect x="3.2" y="14.6" width="7.4" height="6.2" rx="2.2"/><rect x="13.4" y="3.2" width="7.4" height="6.2" rx="2.2"/><rect x="13.4" y="12.2" width="7.4" height="8.6" rx="2.2"/>'),
   vendas: svg('<path d="M5.2 4.6h10.4l3.6 3.7v11.1a1 1 0 0 1-1.45.9L15 18.9l-3 1.5-3-1.5-2.75 1.4A1 1 0 0 1 4.7 19.4V6.1a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M8.6 9.6h6.8M8.6 13h4.4"/>'),
+  analises: svg('<path d="M8.4 4.6h7.2v2.2H8.4z"/><path d="M8.4 5.7H6.2v13.7h11.6V5.7h-2.2"/><path d="m9.3 12.6 1.9 1.9 3.5-3.9"/>'),
   clientes: svg('<circle cx="9.6" cy="8.2" r="3.2"/><path d="M4 19.4c.5-3.1 2.9-4.9 5.6-4.9s5.1 1.8 5.6 4.9"/><path d="M16.3 6.9a3 3 0 0 1 0 5.5M18.4 19.4c-.2-1.8-.8-3.2-1.9-4.2"/>'),
   produtos: svg('<path d="M12 3.4 19.8 7.5v9L12 20.6 4.2 16.5v-9Z"/><path d="M4.2 7.5 12 11.6l7.8-4.1M12 11.6v9"/>'),
   financeiro: svg('<path d="M4 19.6V10M9.7 19.6V5M15.4 19.6v-7.2M21 19.6V7.6"/><path d="M2.6 19.6h18.8"/>', 1.7),
@@ -794,6 +795,7 @@ var MENU = [
   { k: "vendas", n: "Vendas", perfis: ["admin", "vendedor"] },
   { k: "clientes", n: "Clientes", perfis: ["admin", "vendedor"] },
   { k: "produtos", n: "Produtos", perfis: ["admin", "vendedor"] },
+  { k: "analises", n: "Análise de crédito", perfis: ["admin", "vendedor"] },
   { k: "financeiro", n: "Financeiro", perfis: ["admin"] },
   { k: "negociacao", n: "Negociação", perfis: ["admin"] },
   { k: "buscar", n: "Buscar", perfis: ["admin", "vendedor"] },
@@ -1018,6 +1020,10 @@ function migrarSenhas() {
   var mudou = false;
   DB.users.forEach(function (u) {
     if (u.senha_hash) return;
+    /* pessoa que chegou pelo pacote do ambiente: a senha dela vive no
+       servidor. Inventar uma temporária aqui só criaria uma senha falsa
+       na tela de credenciais e confundiria quem for entregar o acesso. */
+    if (u.senha_pela_nuvem) return;
     if (!u.senha) u.provisoria = senhaProvisoria();
     protegerSenha(u, u.senha || u.provisoria);
     u.trocar_senha = true;
@@ -1975,7 +1981,7 @@ function montarMenu() {
   var grupos = isHolding()
     ? [["Rede", ["panorama", "rede_empresas", "rede_indicadores", "rede_ranking"]],
        ["Gestão", ["rede_financeiro", "rede_alertas"]], ["Vyora", ["rede_vyora"]], ["Ajustes", ["config"]]]
-    : [["Operação", ["pdv", "dashboard", "vendas", "supervisao", "clientes", "produtos", "leads"]],
+    : [["Operação", ["pdv", "dashboard", "vendas", "supervisao", "clientes", "analises", "produtos", "leads"]],
        ["Gestão", ["financeiro", "negociacao", "buscar"]], ["Vyora", ["rede_vyora"]], ["Ajustes", ["config"]]];
   var fv = faturaVencida();
   var html = "";
@@ -1988,6 +1994,12 @@ function montarMenu() {
       if (m.k === "financeiro" && venc) extra = '<span class="cnt">' + venc + "</span>";
       if (m.k === "buscar" && !redeAtiva()) extra = '<span class="lk" style="width:15px;height:15px">' + ICON.lock + "</span>";
       if (m.k === "clientes" && blacklist().length) extra = '<span class="cnt">' + blacklist().length + "</span>";
+      if (m.k === "analises") {
+        var esperando = analises().filter(function (a) {
+          return a.status === "aguardando_visita" || a.status === "visita_agendada";
+        }).length;
+        if (esperando) extra = '<span class="cnt">' + esperando + "</span>";
+      }
       if (m.k === "config" && fv) extra = '<span class="cnt">1</span>';
       html += '<button class="nav-i' + (View.pg === m.k ? " on" : "") + '" data-k="' + m.k + '" onclick="ir(\'' + m.k + '\')">' + (ICON[m.k] || ICON.file) + esc(m.n) + extra + "</button>";
     });
@@ -2019,6 +2031,7 @@ document.addEventListener("click", function (e) { if (!e.target.closest(".bar-r"
 var TITULOS = {
   dashboard: ["Dashboard", "Visão geral do negócio"], supervisao: ["Supervisão de PDV", "Presença e produtividade no caixa"], vendas: ["Vendas", "Contratos, parcelas e situação"],
   clientes: ["Clientes", "Cadastro, compras e débitos"], produtos: ["Produtos", "Disponibilidade e movimentação"],
+  analises: ["Análise de crédito", "Formulário, visita técnica e decisão"],
   financeiro: ["Financeiro", "Caixa, resultado e pró-labore"],
   buscar: ["Buscar", "Consulta de clientes e histórico de crédito"],
   leads: ["Leads", "Contatos das campanhas · Vyora Growth"],
@@ -2338,7 +2351,7 @@ function confirmarLimpar() {
 function pg_vendas() {
   var todas = vendas();
   if (!todas.length) {
-    return head("Vendas", "Cada venda gera contrato, parcelas e recebimentos") +
+    return head("Vendas", "Do crédito aprovado à entrega, e depois o contrato") + painelCrediario() +
       '<div class="box">' + vazio("Nenhuma venda registrada",
         "Registre a primeira venda: o sistema cria o contrato, o carnê de parcelas e lança os recebimentos no caixa.",
         '<button class="btn btn-p btn-lg" onclick="modalVenda()">' + ICON.plus + "Registrar venda</button>", "vendas") + "</div>";
@@ -2359,6 +2372,8 @@ function pg_vendas() {
     segPeriodo(true) +
     '<button class="btn" onclick="modalRelatorios(\'vendas\')">' + ICON.file + "Relatórios" + "</button>" +
     '<button class="btn btn-p" onclick="modalVenda()">' + ICON.plus + "Nova venda</button>");
+  /* antes dos números: quem já foi aprovado e ainda não recebeu o produto */
+  h += painelCrediario();
   h += '<div class="grid c4" style="margin-bottom:20px">' +
     metric("Vendido no período", money(sum(doPeriodo.filter(function (s) { return statusVenda(s) !== "cancelada"; }), function (s) { return s.total; })),
       doPeriodo.length + " venda(s) · " + per[2]) +
@@ -3085,7 +3100,10 @@ function pg_produtos() {
       '<button class="btn" onclick="modalEstoque()">' + ICON.box + "Entrada de estoque</button>" : ""));
   h += '<div class="grid c4" style="margin-bottom:20px">' +
     metric("Itens disponíveis", n0(sum(ativos, function (p) { return p.estoque; })), ativos.length + " produtos cadastrados") +
-    metric("Valor em estoque", money(sum(ativos, function (p) { return p.estoque * p.custo; })), "a preço de custo") +
+    /* o vendedor não enxerga custo: o que ele precisa é o que vai vender */
+    (isAdmin()
+      ? metric("Valor em estoque", money(sum(ativos, function (p) { return p.estoque * p.custo; })), "a preço de custo")
+      : metric("Valor do catálogo", money(sum(ativos, function (p) { return p.estoque * p.preco; })), "a preço de venda")) +
     metric("Precisam de reposição", n0(falta.length), falta.length ? "no estoque mínimo ou abaixo" : "estoque saudável", falta.length ? "neg" : "pos") +
     metric("Mais vendido (90 dias)", top && top.q ? esc(top.p.nome.split(" ").slice(0, 2).join(" ")) : "—", top && top.q ? top.q + " unidades" : "sem saídas") +
     "</div>";
@@ -4473,7 +4491,7 @@ var PDV = { itens: [], busca: "", cat: "" };
 function pg_pdv() {
   var prods = Q("products").filter(function (p) { return p.status === "ativo"; });
   if (!prods.length) {
-    return head("Vender", "Catálogo da loja") +
+    return head("Vender", "Catálogo da loja") + cardsVisita() +
       '<div class="box">' + vazio("Nenhum produto no catálogo",
         "Peça ao administrador para cadastrar os produtos. Eles aparecem aqui como cartões para você vender.", "", "produtos") + "</div>";
   }
@@ -4486,6 +4504,8 @@ function pg_pdv() {
 
   var h = head("Vender", "Toque nos produtos para montar a venda",
     (PDV.itens.length ? '<button class="btn btn-p" onclick="fecharPdv()">' + ICON.check + "Finalizar · " + money(total) + "</button>" : ""));
+  /* antes do catálogo: quem está esperando a sua visita hoje */
+  h += cardsVisita();
   h += '<div class="filters">' +
     '<div class="srch"><span class="i">' + ICON.search + '</span><input id="pdv-q" placeholder="Buscar produto" value="' + esc(PDV.busca) + '" oninput="PDV.busca=this.value;debPdv()"></div>' +
     (cats.length > 1 ? '<div class="seg" style="overflow-x:auto">' + [["", "Todos"]].concat(cats.map(function (c) { return [c, c]; })).map(function (o) {
@@ -5130,6 +5150,15 @@ function pg_config(p) {
         '<div class="rw rw2"><div class="fld"><label>Comissão do vendedor (%)</label><input id="c-com" type="number" step="0.1" value="' + c.comissao_pct + '"></div>' +
         '<div class="fld"><label>Estoque mínimo padrão</label><input id="c-min" type="number" value="' + c.estoque_min + '"></div></div>' +
         '<button class="btn btn-p" onclick="salvarRegras()">Salvar regras</button></div>') +
+      box("Entrega e pagamento", '<div class="box-b">' +
+        '<div class="fld"><label>Valor do frete (R$)</label>' +
+        '<input id="c-frete" type="number" step="10" value="' + (c.frete_valor != null ? c.frete_valor : FRETE_PADRAO) + '">' +
+        '<div class="hp">Cobrado uma vez, depois da aprovação do crédito e antes de marcar a entrega.</div></div>' +
+        '<div class="fld"><label>Link de pagamento (Pix, QR ou maquininha)</label>' +
+        '<input id="c-pag" value="' + esc(c.pagamento_link || "") + '" placeholder="https://...">' +
+        '<div class="hp">É o link que o cliente recebe para pagar o frete. O dinheiro cai direto na sua conta — ' +
+        "a Vyora não entra no meio e não guarda nada de pagamento.</div></div>" +
+        '<button class="btn btn-p" onclick="salvarEntregaPagamento()">Salvar</button></div>') +
       box("Metas e retirada", '<div class="box-b">' +
         '<div class="fld"><label>Pró-labore definido por mês (R$)</label><input id="c-pl" type="number" step="100" value="' + c.pro_labore_mensal + '"></div>' +
         '<div class="fld"><label>Meta padrão de faturamento (R$)</label><input id="c-meta" type="number" step="100" value="' + c.meta_mes + '">' +
@@ -5245,6 +5274,16 @@ function salvarVisual() {
   var c = cfg();
   c.sigla = v("t-sigla").toUpperCase() || ini2(org().nome); c.cor = v("t-cor");
   logar("Identidade visual atualizada", c.cor); save(); aplicarMarca(); toast("Identidade aplicada.", "ok"); ir("config", { tab: "empresa" });
+}
+function salvarEntregaPagamento() {
+  var c = cfg();
+  c.frete_valor = nv("c-frete");
+  c.pagamento_link = v("c-pag");
+  logar("Frete e pagamento atualizados", money(c.frete_valor));
+  save();
+  if (!LINK_LOJA.codigo) buscarLinkLoja();
+  atualizarLinkPagamentoNuvem();
+  toast("Salvo.", "ok"); ir("config", { tab: "sistema" });
 }
 function salvarRegras() {
   var c = cfg();
@@ -5382,7 +5421,8 @@ function modalCredencialUsuario(id) {
     nota("Passe estes dados para a pessoa. A <b>senha é temporária</b>: no primeiro acesso o sistema obriga a trocar, e depois disso ninguém mais vê a senha dela — nem você.", "wr") +
     '<div class="ln"><span class="k">Token da empresa</span><span class="v mono">' + esc(t.token) + "</span></div>" +
     '<div class="ln"><span class="k">E-mail</span><span class="v">' + esc(u.email) + "</span></div>" +
-    '<div class="ln"><span class="k">Senha temporária</span><span class="v mono">' + esc(u.provisoria || "já trocada") + "</span></div>" +
+    '<div class="ln"><span class="k">Senha temporária</span><span class="v mono">' +
+      esc(credencialPendente(u) || "já trocada pela pessoa") + "</span></div>" +
     ln("Perfil", PERFIS[u.perfil].nome),
     '<button class="btn btn-p" onclick="fecharModal()">Entendi</button>');
 }
@@ -5684,8 +5724,30 @@ var SUPA_KEY = "sb_publishable_d1acZQt5kyHr_bwfIfiRcA_jXGZWfUq";
 var TABELAS = {
   customers: "customers", products: "products", moves: "moves",
   sales: "sales", parcels: "parcels", cash: "cash", metas: "metas",
-  cobrancas: "cobrancas", acordos: "acordos", leads: "leads_empresa", logs: "logs"
+  cobrancas: "cobrancas", acordos: "acordos", leads: "leads_empresa", logs: "logs",
+  /* a equipe e as configurações sincronizam como todo o resto: criou um
+     login, ele aparece nos outros aparelhos em segundos. Senha nenhuma
+     sobe — o que viaja é o cadastro, sem nada que derive dela. */
+  users: "equipe", config: "config_empresa",
+  analises: "analises", restricoes: "restricoes"
 };
+/* coleções onde existe segredo local que NÃO pode subir nem ser
+   sobrescrito pelo que desce */
+var SEM_SUBIR = { users: ["senha", "senha_hash", "salt", "senha_em", "provisoria", "senha_nova_guardada", "senha_nuvem_pendente", "tentativas", "bloqueio_ate", "bloqueado_ate"] };
+function paraNuvem(col, r) {
+  var proibido = SEM_SUBIR[col];
+  if (!proibido) return r;
+  var c = {};
+  for (var k in r) if (r.hasOwnProperty(k) && proibido.indexOf(k) < 0) c[k] = r[k];
+  return c;
+}
+/* o que desce não encosta no segredo que já existe aqui */
+function juntarLocal(col, atual, vindo) {
+  var proibido = SEM_SUBIR[col];
+  if (!proibido || !atual) return vindo;
+  for (var k in vindo) if (vindo.hasOwnProperty(k) && proibido.indexOf(k) < 0) atual[k] = vindo[k];
+  return atual;
+}
 var SYNC = {
   ligado: false, estado: "desligado", erro: "",
   token: null, exp: 0, email: "", tenant: "", perfil: "",
@@ -5781,10 +5843,11 @@ function pendentes() {
     var atuais = (DB[col] || []).filter(function (x) { return x.tenant_id === T(); });
     var anterior = esp[col] || {}, agora = {}, envios = [];
     atuais.forEach(function (r) {
-      var a = assinatura(r);
+      var limpo = paraNuvem(col, r);
+      var a = assinatura(limpo);
       agora[r.id] = a;
       if (anterior[r.id] !== a) {
-        envios.push({ id: r.id, tenant_id: r.tenant_id, dados: r, excluido: false });
+        envios.push({ id: r.id, tenant_id: r.tenant_id, dados: limpo, excluido: false });
       }
     });
     for (var id in anterior) {
@@ -5827,6 +5890,7 @@ function enviarPendentes(depois) {
           if (x.excluido) delete esp[col][x.id];
           else esp[col][x.id] = assinatura(x.dados);
         });
+        if (col === "users") { montarMenu(); montarUsuario(); }
       } else if (r.status === 401 || r.status === 403) {
         SYNC.token = null; SYNC.estado = "expirada";
       } else {
@@ -5873,8 +5937,16 @@ function aplicarRemoto(col, linhas) {
     vindo.id = linha.id; vindo.tenant_id = linha.tenant_id;
     var a = assinatura(vindo);
     if (pos >= 0) {
-      if (assinatura(DB[col][pos]) !== a) { DB[col][pos] = vindo; mudou = true; }
-    } else { DB[col].push(vindo); mudou = true; }
+      if (assinatura(paraNuvem(col, DB[col][pos])) !== a) {
+        DB[col][pos] = juntarLocal(col, DB[col][pos], vindo);
+        mudou = true;
+      }
+    } else {
+      /* pessoa que chegou de outro aparelho: a senha dela vive na nuvem */
+      if (col === "users") vindo.senha_pela_nuvem = true;
+      DB[col].push(vindo);
+      mudou = true;
+    }
     esp[col][linha.id] = a;
   });
   gravarEspelho(esp); gravarRelogio(rel);
@@ -5924,6 +5996,35 @@ function lacoSync() {
     lacoSync();
   }, ritmoSync());
 }
+/* =======================================================================
+   DUAS ABAS, UM BANCO SÓ
+
+   Cada aba do navegador guarda uma cópia do banco na memória e grava por
+   cima do arquivo comum quando salva. Sem combinar nada, a aba antiga
+   apaga o que a aba nova acabou de cadastrar — foi assim que o vendedor
+   recém-criado sumia ao abrir uma guia nova.
+
+   O navegador avisa as OUTRAS abas sempre que este arquivo muda. Aqui a
+   gente escuta esse aviso, recarrega o banco e redesenha a tela.
+   ======================================================================= */
+var _recarregando = false;
+function ouvirOutrasAbas() {
+  if (typeof window.addEventListener !== "function") return;
+  window.addEventListener("storage", function (e) {
+    if (!e || e.key !== KEY || _recarregando) return;
+    _recarregando = true;
+    try {
+      var antes = Sess;
+      if (load()) {
+        Sess = antes;
+        if (Sess && !find(DB.users, Sess.user_id)) { Sess = null; return renderLogin(); }
+        if (Sess && View.pg) ir(View.pg, View.p);
+        else if (!Sess && el("lg-perfis")) renderLoginUsers();
+      }
+    } catch (err) {} finally { _recarregando = false; }
+  });
+}
+
 /* toda gravação local agenda uma subida — sem travar a tela */
 var _saveLocal = save, _syncAgendado = null;
 save = function () {
@@ -6005,16 +6106,48 @@ function trocarSenhaNuvem(nova, depois) {
     .then(function (r) { if (depois) depois(r.ok); })
     .catch(function () { if (depois) depois(false); });
 }
-/* a pessoa entrou com a senha certa aqui, mas a nuvem recusou:
-   as duas divergiram. Alinhamos usando a sessão local como verdade. */
+/* =======================================================================
+   O CONSERTO AUTOMÁTICO
+
+   Se a pessoa entrou aqui com a senha certa e mesmo assim a nuvem
+   recusou, alguma coisa está desencontrada — e ela não tem como saber
+   disso, nem deveria. O sistema conserta sozinho:
+
+     1. tenta entrar na nuvem com a mesma senha;
+     2. se a conta não existe, pede ao servidor que crie, apresentando
+        o TOKEN da empresa (a função confere o token e a equipe antes
+        de criar, e recusa se a conta já existir);
+     3. entra e sincroniza.
+
+   Se a conta existe com outra senha, só a Vyora ou o administrador
+   consegue reparar — e aí o sistema avisa, em vez de ficar mudo. */
+function provisionarAcessoNuvem(email, senha, depois) {
+  var t = find(DB.tenants, T()) || find(DB.tenants, window.__env);
+  if (!podeNuvem() || !t || !t.token) return depois && depois(false, "sem token da empresa");
+  fetch(SUPA_URL + "/functions/v1/redefinir-senha", {
+    method: "POST",
+    headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SUPA_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ acao: "provisionar", token: t.token, email: String(email).toLowerCase(), senha: senha })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) { if (depois) depois(!!(x.ok && x.j && x.j.ok), x.j && x.j.erro, x.j && x.j.existe); })
+    .catch(function () { if (depois) depois(false, "sem resposta do servidor"); });
+}
 function alinharSenhaNuvem(email, senha) {
   if (!podeNuvem() || nuvemViva()) return;
   conectarNuvem(email, senha, function (ok) {
     if (ok) return;
-    /* conta não existe ainda: cria com a senha atual */
-    var u = me();
-    if (u) criarContaNuvem(email, senha, u.perfil, function (feito) {
-      if (feito) conectarNuvem(email, senha);
+    /* a conta pode simplesmente não existir ainda — o servidor cria,
+       conferindo o token da empresa e a equipe publicada */
+    provisionarAcessoNuvem(email, senha, function (feito, motivo, existe) {
+      if (feito) return conectarNuvem(email, senha, function (entrou) {
+        if (entrou) { toast("Sincronização ligada.", "ok"); sincronizar(); }
+      });
+      if (existe) {
+        SYNC.estado = "desencontrada";
+        SYNC.erro = "A senha deste acesso na nuvem está diferente da daqui.";
+        pintarSync();
+        if (isAdmin()) toast("A sincronização deste acesso precisa de reparo. Abra Configurações › Cópias e registro.", "err");
+      }
     });
   });
 }
@@ -6022,14 +6155,16 @@ function alinharSenhaNuvem(email, senha) {
 /* ---------------- o que a pessoa vê ---------------- */
 function textoSync() {
   if (!SYNC.ligado) {
+    if (SYNC.estado === "desencontrada") return ["Sincronização parada", "o acesso na nuvem precisa de reparo"];
     if (SYNC.estado === "sem-perfil") return ["Só neste computador", "sem acesso na nuvem para este login"];
-    if (SYNC.estado === "sem-conta") return ["Só neste computador", "conta da nuvem não encontrada"];
+    if (SYNC.estado === "sem-conta") return ["Ligando a sincronização…", "criando o acesso na nuvem"];
     return ["Só neste computador", "sincronização desligada"];
   }
   if (SYNC.estado === "offline") return ["Trabalhando offline", SYNC.fila + " alteração(ões) esperando"];
   if (SYNC.estado === "enviando") return ["Enviando…", SYNC.fila + " na fila"];
   if (SYNC.estado === "expirada") return ["Reconectando…", "a sessão da nuvem expirou"];
   if (SYNC.estado === "erro") return ["Falha ao sincronizar", SYNC.erro];
+  if (SYNC.estado === "desencontrada") return ["Sincronização parada", "o acesso na nuvem precisa de reparo"];
   if (SYNC.fila) return ["Sincronizando", SYNC.fila + " na fila"];
   return ["Tudo sincronizado", SYNC.ultima ? "última troca " + fdt(SYNC.ultima) : "pronto"];
 }
@@ -6051,6 +6186,11 @@ function modalSync() {
     ln("Perfil reconhecido", SYNC.perfil ? esc(SYNC.perfil) : "—") +
     ln("Alterações na fila", String(SYNC.fila)) +
     ln("Última troca", SYNC.ultima ? fdt(SYNC.ultima) : "ainda não houve") +
+    (SYNC.estado === "desencontrada"
+      ? nota("<b>A senha deste acesso na nuvem está diferente da que você usa aqui.</b> Enquanto isso, o que você faz " +
+        "fica só neste computador. Para religar: peça à Vyora uma <b>nova senha temporária</b> para este e-mail — " +
+        "ela vale nos dois lados e a sincronização volta sozinha no próximo acesso.", "ng")
+      : "") +
     '<div class="hp" style="margin-top:12px">Os dados continuam guardados neste computador e sobem quando há internet. ' +
     "Quem decide o que cada pessoa enxerga é o servidor — não este arquivo.</div>",
     '<button class="btn" onclick="fecharModal()">Fechar</button>' +
@@ -6342,6 +6482,21 @@ var TOURS = {
         d: "Ao registrar, o sistema já dá baixa no estoque, gera as parcelas com vencimento e joga o valor no financeiro. Um lançamento só, três consequências." },
       { alvo: "#page .box", pos: "cima", t: "A situação de cada uma",
         d: "Ativa, atrasada, quitada ou cancelada. Clique na linha para abrir a venda, ver o histórico de pagamento e imprimir contrato ou carnê." }
+    ]
+  },
+  analises: {
+    nome: "Análise de crédito",
+    passos: [
+      { alvo: "#page .head", pos: "baixo", t: "Do WhatsApp para cá",
+        d: "Você gera um link, manda para o cliente e ele preenche no celular. O que antes era conversa solta vira ficha organizada, com documentos anexados e prazo contado." },
+      { alvo: "#page .grid", pos: "baixo", t: "O prazo de 72 horas é visível",
+        d: "Assim que o cliente envia o formulário, ele entra na fila de visita. O relógio começa a correr e o cliente enxerga esse mesmo prazo no link dele — por isso atraso aqui vira desconfiança lá." },
+      { alvo: "#page .box", pos: "cima", t: "Quem decide é o vendedor, na casa",
+        d: "O sistema não aprova ninguém sozinho. Ele organiza a fila e guarda o que foi apurado. A entrevista continua sendo olho no olho." },
+      { alvo: "#page .box", pos: "cima", t: "Aprovar não é vender",
+        d: "Depois do aprovado vem o frete e depois a entrega. Esse caminho fica em Vendas, com o cliente acompanhando cada passo pelo mesmo link que ele preencheu." },
+      { alvo: "#page .box", pos: "cima", t: "Má referência é decisão séria",
+        d: "Reprovar é uma coisa; registrar má referência é outra. O registro passa a avisar as outras empresas da sua rede, então ele pede um relato escrito e fica com o nome de quem registrou." }
     ]
   },
   clientes: {
@@ -6919,8 +7074,21 @@ function entrarComAmbienteNovo() {
           "e, se ele estiver certo, avise a Vyora que o ambiente da empresa ainda não foi publicado.");
       }
       instalarAmbiente(pac);
-      var u = DB.users.filter(function (x) { return x.email && x.email.toLowerCase() === mail; })[0];
+      /* tem que ser alguém DESTA empresa: o mesmo e-mail pode existir em
+         outra que já esteja instalada neste computador */
+      var u = DB.users.filter(function (x) {
+        return x.tenant_id === pac.tenant.id && x.email && x.email.toLowerCase() === mail;
+      })[0];
       if (!u) { nuvemEsquecer(); return bad("O seu usuário não faz parte da equipe desta empresa."); }
+      if (u.status && u.status !== "ativo") {
+        nuvemEsquecer();
+        return bad("Este acesso está suspenso. Procure o administrador da sua empresa.");
+      }
+      var travado = bloqueioAtivo(u);
+      if (travado) {
+        nuvemEsquecer();
+        return bad("Acesso bloqueado por tentativas erradas. Tente de novo em " + travado + " minuto(s).");
+      }
       protegerSenha(u, pass);
       delete u.senha_pela_nuvem;
       u.status = u.status || "ativo";
@@ -6964,6 +7132,14 @@ function senhaPelaNuvem(u, senha, ok, nao) {
 function trocarSenhaNosDoisLados(u, nova, depois) {
   protegerSenha(u, nova);
   u.trocar_senha = false;
+  /* a senha temporária morre aqui: ela viajou por WhatsApp e não pode
+     continuar guardada no banco nem aparecendo em tela nenhuma */
+  delete u.provisoria;
+  delete u.senha_pela_nuvem;
+  if (u.perfil === "admin") {
+    var t = find(DB.tenants, u.tenant_id);
+    if (t) delete t.senha_provisoria;
+  }
   u.senha_nuvem_pendente = true;
   u.senha_nova_guardada = nova;
   save();
@@ -7144,13 +7320,740 @@ cuidarDoAmbiente = function () {
   if (typeof me === "function" && me()) alinharSenhaPendente(me());
   if (copiasDisponiveis() && !COPIAS.feita) garantirCopiaDoDia();
 };
+
+/* =======================================================================
+   ANÁLISE DE CRÉDITO COM VISITA TÉCNICA
+
+   UM LINK SÓ, DA LOJA. Ele é gerado uma vez e vale para sempre: vai no
+   WhatsApp, no status, num QR colado na vitrine. Quem quiser comprar no
+   crediário abre, preenche e entra na fila. Ninguém gera link por
+   cliente — isso seria trocar um trabalho manual por outro.
+
+   O caminho é o que a loja já faz hoje:
+
+     formulário → fila de visita (72h) → entrevista → decisão
+
+   Ninguém é aprovado automaticamente. O sistema organiza a fila, guarda
+   os documentos e registra quem decidiu o quê. A entrevista continua
+   sendo do vendedor, na casa da pessoa.
+
+   Reprovar não é o mesmo que registrar má referência. São dois atos
+   diferentes, e o segundo pede um relato escrito — porque passa a valer
+   para as outras empresas da rede.
+   ======================================================================= */
+var ETAPAS_ANALISE = {
+  aguardando_visita: ["Aguardando visita", "t-wr", "na fila, prazo de 72 horas"],
+  visita_agendada: ["Visita marcada", "t-inf", "data combinada com o cliente"],
+  aprovado: ["Aprovado · falta o frete", "t-pos", "esperando o pagamento do frete"],
+  frete_pago: ["Frete pago", "t-inf", "pronto para marcar a entrega"],
+  entrega_agendada: ["Entrega marcada", "t-inf", "data combinada com o cliente"],
+  entregue: ["Entregue", "t-pos", "produto na casa do cliente"],
+  reprovado: ["Reprovado", "t-neg", "não passou na análise"],
+  cancelado: ["Cancelado", "t-mut", "encerrado pela empresa"]
+};
+var MOTIVOS_REPROVA = [
+  "Renda não comprovada",
+  "Renda incompatível com a parcela",
+  "Endereço não confere",
+  "Referências não confirmaram",
+  "Não encontrado no endereço",
+  "Má referência na vizinhança",
+  "Desistiu da compra"
+];
+
+function analises() { return Q("analises"); }
+function analisesPorEtapa(e) { return srt(analises().filter(function (a) { return a.status === e; }), function (a) { return a.criada; }, true); }
+function prazoVisita(a) { return a.visita_ate ? dDiff(today(), a.visita_ate) : null; }
+function analiseAtrasada(a) {
+  var d = prazoVisita(a);
+  return a.status === "aguardando_visita" && d !== null && d < 0;
+}
+function visitasDoVendedor(uid) {
+  return srt(analises().filter(function (a) {
+    return (a.status === "aguardando_visita" || a.status === "visita_agendada") &&
+      (!a.vendedor_id || a.vendedor_id === uid);
+  }), function (a) { return a.visita_ate || "9999-12-31"; });
+}
+
+/* ---------------- o link da loja ---------------- */
+var LINK_LOJA = { codigo: "", buscando: false, erro: "" };
+function codigoLoja() {
+  var letras = "abcdefghijkmnopqrstuvwxyz23456789", s = "";
+  for (var i = 0; i < 10; i++) s += letras[Math.floor(Math.random() * letras.length)];
+  return s;
+}
+function enderecoDoFormulario(codigo) {
+  return String(location.href).replace(/[^/]*$/, "") + "analise.html?e=" + codigo;
+}
+function buscarLinkLoja() {
+  if (!nuvemViva() || LINK_LOJA.buscando) return;
+  LINK_LOJA.buscando = true;
+  nuvemPedido("/rest/v1/formularios?select=codigo&limit=1", { method: "GET" })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (l) {
+      LINK_LOJA.buscando = false;
+      if (l && l.length) { LINK_LOJA.codigo = l[0].codigo; repintar(); }
+    })
+    .catch(function () { LINK_LOJA.buscando = false; });
+}
+function criarLinkLoja() {
+  if (!nuvemViva()) return toast("Precisa estar conectado ao servidor para gerar o link.", "err");
+  var c = cfg();
+  var corpo = {
+    codigo: codigoLoja(), tenant_id: T(), nome: org().nome,
+    sigla: c.sigla || ini2(org().nome), whatsapp: dig(growthCfg().whatsapp || ""),
+    pagamento_link: (c.pagamento_link || ""), ativo: true
+  };
+  nuvemPedido("/rest/v1/formularios", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(corpo)
+  }).then(function (r) {
+    if (!r.ok) return toast("O servidor recusou criar o link (" + r.status + ").", "err");
+    LINK_LOJA.codigo = corpo.codigo;
+    logar("Link de análise de crédito criado", corpo.codigo);
+    save(); ir("analises");
+    toast("Link criado. Ele vale para sempre — é só divulgar.", "ok");
+  }).catch(function () { toast("Sem resposta do servidor.", "err"); });
+}
+/* o link de pagamento muda nas configurações e precisa chegar na página
+   que o cliente abre — senão ele vê o valor do frete e não sabe onde pagar */
+function atualizarLinkPagamentoNuvem() {
+  if (!nuvemViva() || !LINK_LOJA.codigo) return;
+  nuvemPedido("/rest/v1/formularios?codigo=eq." + encodeURIComponent(LINK_LOJA.codigo), {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ pagamento_link: cfg().pagamento_link || "", nome: org().nome,
+      sigla: cfg().sigla || ini2(org().nome), whatsapp: dig(growthCfg().whatsapp || "") })
+  }).catch(function () {});
+}
+function copiar(txt) {
+  try {
+    var e = document.createElement("textarea");
+    e.value = txt; document.body.appendChild(e); e.select(); document.execCommand("copy"); e.remove();
+    toast("Link copiado.", "ok");
+  } catch (err) { toast("Não foi possível copiar. Selecione o link e copie à mão.", "err"); }
+}
+function modalLinkLoja() {
+  if (!LINK_LOJA.codigo) return;
+  var link = enderecoDoFormulario(LINK_LOJA.codigo);
+  var msg = "Olá! Para comprar no crediário da " + org().nome + ", preencha a análise de crédito por aqui: " +
+    link + " — leva uns 5 minutos, pelo próprio celular. Depois um vendedor entra em contato para a visita.";
+  modal("Link da análise de crédito",
+    nota("Este é o <b>link da loja</b>. Ele é sempre o mesmo: mande no WhatsApp, cole no status, " +
+      "coloque na descrição do perfil, imprima em QR na vitrine. Não existe link por cliente.", "inf") +
+    '<div class="fld"><label>Endereço</label><input value="' + esc(link) + '" readonly onclick="this.select()"></div>' +
+    '<div class="fld"><label>Mensagem pronta para o WhatsApp</label><textarea rows="4" readonly onclick="this.select()">' +
+      esc(msg) + "</textarea></div>" +
+    '<div class="hp">Quem preencher entra direto na fila de visita, com prazo de 72 horas. ' +
+    "A pessoa acompanha o andamento voltando neste mesmo endereço.</div>",
+    '<button class="btn" onclick="copiar(\'' + esc(link).replace(/'/g, "") + '\')">Copiar o link</button>' +
+    '<a class="btn btn-g" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(msg) + '">Compartilhar no WhatsApp</a>' +
+    '<button class="btn btn-p" onclick="fecharModal()">Pronto</button>');
+}
+
+/* ---------------- má referência ---------------- */
+function restricoes() { return (DB.restricoes || []).filter(function (r) { return !r.revogada; }); }
+function restricaoDoCpf(cpf) {
+  var d = dig(cpf);
+  if (!d) return null;
+  return restricoes().filter(function (r) { return dig(r.cpf) === d; })[0] || null;
+}
+function registrarRestricao(cpf, nome, motivo, origem) {
+  DB.restricoes = DB.restricoes || [];
+  DB.restricoes.push({
+    id: uid("rs"), tenant_id: T(), cpf: dig(cpf), nome: nome || "",
+    motivo: motivo, origem: origem || "", registrada: today(),
+    por: Sess.user_id, empresa: org().nome, revogada: false
+  });
+  logar("Má referência registrada", nome + " · " + motivo);
+}
+function revogarRestricao(id) {
+  var r = (DB.restricoes || []).filter(function (x) { return x.id === id; })[0];
+  if (!r) return;
+  if (r.tenant_id !== T()) return toast("Só a empresa que registrou pode retirar.", "err");
+  confirmar("Retirar a má referência de " + esc(r.nome || "este CPF") + "?",
+    "O registro deixa de aparecer para as empresas da rede. A retirada fica na auditoria.", function () {
+      r.revogada = true; r.revogada_em = today(); r.revogada_por = Sess.user_id;
+      logar("Má referência retirada", r.nome || r.cpf);
+      save(); fecharModal(); ir("analises"); toast("Registro retirado.", "ok");
+    }, "Retirar");
+}
+/* ---------------- o que o vendedor faz depois da visita ---------------- */
+function modalVisita(id) {
+  var a = find(DB.analises, id);
+  if (!a) return;
+  var f = a.formulario || {};
+  var rest = f.cpf ? restricaoDoCpf(f.cpf) : null;
+
+  modal("Visita · " + esc(a.nome),
+    (rest ? nota("<b>Atenção: este CPF tem má referência registrada.</b><br>" +
+      esc(rest.motivo) + " — registrado por <b>" + esc(rest.empresa || "outra empresa da rede") + "</b> em " +
+      fdate(rest.registrada) + ".", "ng") : "") +
+    (f.nome ? "" : nota("O cliente ainda não preencheu o formulário. Sem isso não há o que visitar.", "wr")) +
+    '<div class="fld"><label>Como foi a entrevista? <span class="rq">*</span></label>' +
+      '<select id="vs-res" onchange="mostrarMotivoVisita()">' +
+      '<option value="">Escolha</option>' +
+      '<option value="aprovado">Aprovado — pode comprar</option>' +
+      '<option value="reprovado">Reprovado — não passou</option>' +
+      '<option value="visita_agendada">Ainda não visitei — remarcar</option>' +
+      "</select></div>" +
+    '<div id="vs-caixa-motivo" class="hidden">' +
+      '<div class="fld"><label>Motivo <span class="rq">*</span></label><select id="vs-motivo">' +
+      '<option value="">Escolha</option>' +
+      MOTIVOS_REPROVA.map(function (m) { return "<option>" + esc(m) + "</option>"; }).join("") +
+      "</select></div>" +
+      '<label style="display:flex;gap:9px;align-items:flex-start;font-size:13px;margin:4px 0 14px">' +
+      '<input type="checkbox" id="vs-black" style="margin-top:3px">' +
+      "<span><b>Registrar má referência</b> — o CPF passa a aparecer com aviso para as outras empresas da " +
+      "rede. Use quando vizinhos ou conhecidos relatarem pendências. Isso pede um relato escrito abaixo.</span></label>" +
+      '<div class="fld"><label>Relato de quem informou</label>' +
+      '<textarea id="vs-relato" rows="3" placeholder="Quem falou, o que disse, quando"></textarea>' +
+      '<div class="hp">Escreva o que foi apurado. Este texto fica registrado com o seu nome.</div></div>' +
+    "</div>" +
+    '<div class="fld"><label>Observações da visita</label>' +
+      '<textarea id="vs-obs" rows="2" placeholder="O que você viu e ouviu"></textarea></div>' +
+    '<div id="vs-err" class="note ng hidden"></div>',
+    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
+    '<button class="btn btn-p" onclick="salvarVisita(\'' + id + '\')">Registrar resultado</button>');
+}
+function mostrarMotivoVisita() {
+  var c = el("vs-caixa-motivo");
+  if (c) c.classList.toggle("hidden", v("vs-res") !== "reprovado");
+}
+function salvarVisita(id) {
+  var a = find(DB.analises, id), err = el("vs-err");
+  function bad(m) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); }
+  var res = v("vs-res");
+  if (!res) return bad("Diga como foi a entrevista.");
+
+  if (res === "visita_agendada") {
+    a.status = "visita_agendada";
+    a.etapas.push({ etapa: "visita_remarcada", em: new Date().toISOString(), por: Sess.user_id });
+  } else {
+    if (res === "reprovado" && !v("vs-motivo")) return bad("Escolha o motivo da reprovação.");
+    if (res === "reprovado" && ck("vs-black") && v("vs-relato").length < 15) {
+      return bad("Para registrar má referência, escreva o relato de quem informou.");
+    }
+    a.status = res;
+    a.motivo = res === "reprovado" ? v("vs-motivo") : "";
+    a.decidida = today();
+    a.decidida_por = Sess.user_id;
+    a.etapas.push({ etapa: res, em: new Date().toISOString(), por: Sess.user_id });
+    if (res === "reprovado" && ck("vs-black")) {
+      var f = a.formulario || {};
+      if (!f.cpf) return bad("Sem o CPF do formulário não dá para registrar má referência.");
+      registrarRestricao(f.cpf, f.nome || a.nome, v("vs-motivo"), v("vs-relato"));
+      a.ma_referencia = true;
+    }
+  }
+  a.visita_obs = v("vs-obs");
+  a.vendedor_id = a.vendedor_id || Sess.user_id;
+  logar("Visita registrada", a.nome + " · " + res);
+  save(); fecharModal(); ir(View.pg === "pdv" ? "pdv" : "analises");
+  toast(res === "aprovado" ? "Aprovado. O cliente já vê isso no link dele." : "Resultado registrado.", "ok");
+}
+
+/* ---------------- a ficha completa ---------------- */
+function drawerAnalise(id) {
+  var a = find(DB.analises, id);
+  if (!a) return;
+  drawer(esc(a.nome), "análise de crédito · " + (ETAPAS_ANALISE[a.status] || ["—"])[0],
+    [["ficha", "Ficha"], ["etapas", "Andamento"]], "ficha", function (aba) {
+      var f = a.formulario || {};
+      if (aba === "etapas") {
+        return '<div class="box"><div class="box-b">' + (a.etapas || []).map(function (e) {
+          return ln(rotuloEtapa(e.etapa), fdt(e.em) + (e.por ? " · " + esc(userNome(e.por)) : ""));
+        }).join("") +
+          (a.visita_obs ? '<div class="hp" style="margin-top:12px"><b>Observações da visita:</b><br>' + esc(a.visita_obs) + "</div>" : "") +
+          (a.motivo ? nota("Motivo da reprovação: <b>" + esc(a.motivo) + "</b>", "wr") : "") +
+          "</div></div>";
+      }
+      if (!f.nome) {
+        return '<div class="box"><div class="box-b">' +
+          nota("Esta análise não tem formulário — provavelmente foi aberta à mão. " +
+            "Peça à pessoa para preencher pelo link da loja.", "wr") + "</div></div>";
+      }
+      var rest = restricaoDoCpf(f.cpf);
+      return (rest ? nota("<b>Má referência registrada para este CPF.</b> " + esc(rest.motivo) +
+          " — " + esc(rest.empresa || "empresa da rede") + ", " + fdate(rest.registrada), "ng") : "") +
+        '<div class="grid c2">' +
+        box("Quem é", '<div class="box-b">' +
+          ln("Nome", esc(f.nome)) + ln("CPF", esc(ftel(f.cpf) || f.cpf)) +
+          ln("Nascimento", f.nascimento ? fdate(f.nascimento) : "—") +
+          ln("Telefone 1", ftel(f.telefone1)) + ln("Telefone 2", f.telefone2 ? ftel(f.telefone2) : "—") +
+          "</div>") +
+        box("Onde mora", '<div class="box-b">' +
+          ln("Endereço", esc(f.endereco)) + ln("Bairro", esc(f.bairro)) + ln("Cidade", esc(f.cidade)) +
+          ln("Referência 1", esc(f.referencia1)) + ln("Referência 2", esc(f.referencia2 || "—")) +
+          ln("Moradia", esc(f.moradia)) + ln("Tempo na casa", esc(f.tempo_casa || "—")) +
+          "</div>") +
+        box("Trabalho e renda", '<div class="box-b">' +
+          ln("Função", esc(f.funcao)) + ln("Empresa", esc(f.empresa)) +
+          ln("Endereço do trabalho", esc(f.endereco_trabalho)) +
+          ln("Bairro", esc(f.bairro_trabalho || "—")) +
+          ln("Referência", esc(f.referencia_trabalho || "—")) +
+          ln("Renda declarada", money(f.renda)) +
+          ln("Pessoas trabalhando", esc(f.pessoas_trabalhando)) +
+          ln("Renda da casa", f.renda_casa ? money(f.renda_casa) : "—") +
+          "</div>") +
+        box("Referências", '<div class="box-b">' +
+          ln("Endereço de parente", esc(f.endereco_parente)) +
+          (f.contatos || []).map(function (c, i) {
+            return '<div class="ln"><span class="k">Contato ' + (i + 1) + "</span><span class='v'>" +
+              esc(c.nome) + " · " + ftel(c.telefone) +
+              ' <a class="btn btn-s" style="margin-left:8px" target="_blank" rel="noopener" href="https://wa.me/55' +
+              esc(dig(c.telefone)) + '">chamar</a></span></div>';
+          }).join("") + "</div>") +
+        "</div>" +
+        '<div style="height:18px"></div>' +
+        box("O pedido", '<div class="box-b">' +
+          ln("Produto", esc(f.pedido)) +
+          ln("Como quer pagar", (f.parcelas ? f.parcelas + "x de " : "") +
+            (f.parcela_desejada ? money(f.parcela_desejada) : "não informou")) +
+          (f.valor_total ? ln("Total pretendido", money(f.valor_total)) : "") +
+          ln("Melhor dia", "dia " + esc(f.dia_pagamento)) +
+          (f.observacao ? ln("Observação do cliente", esc(f.observacao)) : "") +
+          (f.renda && f.parcela_desejada
+            ? ln("Parcela sobre a renda", pc(f.parcela_desejada / f.renda * 100))
+            : "") +
+          "</div>") +
+        '<div style="height:18px"></div>' +
+        box("Documentos enviados", '<div class="box-b">' +
+          ["renda", "residencia", "foto", "documento"].map(function (t) {
+            var tem = a.anexos && a.anexos[t];
+            return '<div class="ln"><span class="k">' + rotuloAnexo(t) + "</span><span class='v'>" +
+              (tem ? '<button class="btn btn-s" onclick="verAnexo(\'' + a.id + "','" + t + '\')">Abrir</button>'
+                   : '<span class="mut sm">não enviado</span>') + "</span></div>";
+          }).join("") +
+          '<div class="hp" style="margin-top:10px">Os arquivos ficam no servidor, fora deste computador, e ' +
+          "só quem é da empresa consegue abrir.</div></div>");
+    },
+    (["aguardando_visita", "visita_agendada"].indexOf(a.status) >= 0
+      ? '<button class="btn btn-p" onclick="fecharDrawer();modalVisita(\'' + a.id + '\')">Registrar visita</button>'
+      : "") +
+    (a.status === "aprovado" && a.formulario
+      ? '<button class="btn btn-p" onclick="fecharDrawer();clienteDaAnalise(\'' + a.id + '\')">Cadastrar como cliente</button>'
+      : ""));
+}
+function rotuloEtapa(e) {
+  var m = {
+    convite_criado: "Link gerado", formulario_enviado: "Formulário enviado pelo cliente",
+    visita_remarcada: "Visita remarcada", aprovado: "Aprovado na visita",
+    reprovado: "Reprovado na visita", cancelado: "Cancelado",
+    frete_pago: "Frete confirmado", entrega_agendada: "Entrega marcada", entregue: "Entregue ao cliente"
+  };
+  return m[e] || e;
+}
+function rotuloAnexo(t) {
+  var m = { renda: "Comprovante de renda", residencia: "Comprovante de residência", foto: "Foto do cliente", documento: "Documento com foto" };
+  return m[t] || t;
+}
+function verAnexo(id, tipo) {
+  var a = find(DB.analises, id);
+  if (!a || !a.anexos || !a.anexos[tipo]) return;
+  if (!nuvemViva()) return toast("Precisa estar conectado ao servidor para abrir o documento.", "err");
+  nuvemPedido("/storage/v1/object/sign/analises/" + a.anexos[tipo], {
+    method: "POST", body: JSON.stringify({ expiresIn: 120 })
+  }).then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (!j || !j.signedURL) return toast("Não foi possível abrir o documento.", "err");
+      window.open(SUPA_URL + "/storage/v1" + j.signedURL, "_blank");
+      logar("Documento de análise aberto", a.nome + " · " + rotuloAnexo(tipo));
+      save();
+    }).catch(function () { toast("Sem resposta do servidor.", "err"); });
+}
+/* aprovado vira cliente sem redigitar nada */
+function clienteDaAnalise(id) {
+  var a = find(DB.analises, id), f = a && a.formulario;
+  if (!f) return;
+  if (Q("customers").filter(function (c) { return dig(c.cpf) === dig(f.cpf); }).length) {
+    return toast("Este CPF já está cadastrado como cliente.", "err");
+  }
+  DB.customers.push({
+    id: uid("c"), tenant_id: T(), nome: f.nome, cpf: dig(f.cpf), tel: f.telefone1,
+    email: "", nascimento: f.nascimento || "", endereco: f.endereco, bairro: f.bairro,
+    cep: "", cidade: f.cidade, uf: "", profissao: f.funcao,
+    origem: "Análise de crédito", obs: "Aprovado na visita de " + fdate(a.decidida || today()) +
+      ". Referências: " + (f.contatos || []).map(function (c) { return c.nome + " " + ftel(c.telefone); }).join(" · "),
+    criado: today(), criado_por: Sess.user_id
+  });
+  a.virou_cliente = true;
+  logar("Cliente cadastrado pela análise", f.nome);
+  save(); toast("Cliente cadastrado. Já pode vender no crediário.", "ok");
+  ir("clientes");
+}
+
+/* ---------------- a tela da análise ---------------- */
+function pg_analises() {
+  var todas = analises();
+  var fila = analisesPorEtapa("aguardando_visita").concat(analisesPorEtapa("visita_agendada"));
+  var atrasadas = fila.filter(analiseAtrasada);
+  var mes = mIni(today());
+  var decididas = todas.filter(function (a) { return a.decidida && a.decidida >= mes; });
+  var aprovadas = decididas.filter(function (a) { return a.status === "aprovado"; });
+
+  if (!LINK_LOJA.codigo) setTimeout(buscarLinkLoja, 0);
+
+  var h = head("Análise de crédito", "Do formulário à visita, com prazo de 72 horas",
+    (LINK_LOJA.codigo
+      ? '<button class="btn btn-p" onclick="modalLinkLoja()">Ver o link da loja</button>'
+      : '<button class="btn btn-p" onclick="criarLinkLoja()">' + ICON.plus + "Gerar o link da loja</button>"));
+
+  h += (LINK_LOJA.codigo
+    ? nota("O link da sua loja é <b class='mono'>" + esc(enderecoDoFormulario(LINK_LOJA.codigo)) + "</b> — " +
+      "sempre o mesmo. Mande no WhatsApp, cole no status, imprima em QR. Quem preencher entra direto na fila abaixo.", "")
+    : nota("<b>Gere o link da sua loja.</b> É um só, para sempre: você divulga onde quiser e quem quiser comprar " +
+      "no crediário preenche pelo celular. Nada de gerar link para cada pessoa.", "wr"));
+  h += '<div style="height:14px"></div>';
+
+  h += '<div class="grid c4" style="margin-bottom:20px">' +
+    metric("Esperando visita", n0(fila.length), atrasadas.length ? atrasadas.length + " fora do prazo" : "todas dentro do prazo",
+      atrasadas.length ? "neg" : "pos") +
+    metric("Chegaram este mês", n0(todas.filter(function (a) { return a.criada >= mes; }).length), "pelo link da loja") +
+    metric("Decididas no mês", n0(decididas.length), n0(aprovadas.length) + " aprovadas") +
+    metric("Taxa de aprovação", decididas.length ? pc(aprovadas.length / decididas.length * 100) : "—",
+      decididas.length ? "das visitas do mês" : "sem decisões ainda") +
+    "</div>";
+
+  if (atrasadas.length) {
+    h += nota("<b>" + atrasadas.length + " visita(s) passaram das 72 horas.</b> " +
+      esc(atrasadas.slice(0, 3).map(function (a) { return a.nome; }).join(" · ")) +
+      (atrasadas.length > 3 ? " e mais " + (atrasadas.length - 3) : "") +
+      " — o cliente está vendo esse prazo no link dele.", "wr");
+  }
+
+  if (!todas.length) {
+    h += '<div class="box">' + vazio("Nenhuma análise ainda",
+      "Divulgue o link da loja. Cada pessoa que preencher aparece aqui, com prazo de visita contando.",
+      (LINK_LOJA.codigo
+        ? '<button class="btn btn-p btn-lg" onclick="modalLinkLoja()">Ver o link da loja</button>'
+        : '<button class="btn btn-p btn-lg" onclick="criarLinkLoja()">Gerar o link da loja</button>'), "clientes") + "</div>";
+    return h;
+  }
+
+  h += '<div class="grid c21">';
+  h += box("Fila de visitas", (fila.length ? tabela([
+    { h: "Cliente", r: function (a) { return "<b>" + esc(a.nome) + "</b><div class='sm mut'>" + ftel(a.telefone) + "</div>"; } },
+    { h: "Prazo", r: function (a) {
+        var d = prazoVisita(a);
+        if (d === null) return "—";
+        if (d < 0) return '<span class="tag t-neg">' + Math.abs(d) + " dia(s) atrasada</span>";
+        return '<span class="tag ' + (d <= 1 ? "t-wr" : "t-inf") + '">' + (d === 0 ? "vence hoje" : d + " dia(s)") + "</span>";
+      } },
+    { h: "Vendedor", r: function (a) { return a.vendedor_id ? esc(userNome(a.vendedor_id)) : '<span class="mut">a definir</span>'; } },
+    { h: "Pedido", r: function (a) { return esc((a.formulario || {}).pedido || "—"); } }
+  ], fila, "Nenhuma visita na fila") : '<div class="box-b">' +
+    '<div class="sm mut">Nenhuma visita esperando. Assim que um cliente enviar o formulário, ele aparece aqui.</div></div>'),
+    "", "drawerAnalise");
+
+  h += box("Má referência na rede", (restricoes().length ? tabela([
+    { h: "CPF", r: function (r) { return "<b>" + esc(r.cpf) + "</b><div class='sm mut'>" + esc(r.nome || "") + "</div>"; } },
+    { h: "Motivo", r: function (r) { return esc(r.motivo); } },
+    { h: "Empresa", r: function (r) { return esc(r.empresa || "—") + "<div class='sm mut'>" + fdate(r.registrada) + "</div>"; } },
+    { h: "", r: function (r) {
+        return r.tenant_id === T() && isAdmin()
+          ? '<button class="btn btn-s" onclick="revogarRestricao(\'' + r.id + '\')">Retirar</button>' : "";
+      } }
+  ], restricoes(), "Nenhum registro") : '<div class="box-b">' +
+    '<div class="sm mut">Nenhuma má referência registrada. Ela nasce na visita, quando o vendedor apura ' +
+    "pendências com vizinhos ou conhecidos, e passa a valer para as empresas da sua rede.</div></div>"));
+  h += "</div>";
+
+  h += '<div style="height:20px"></div>';
+  h += box("Todas as análises", tabela([
+    { h: "Cliente", r: function (a) { return "<b>" + esc(a.nome) + "</b><div class='sm mut'>" + ftel(a.telefone) + "</div>"; } },
+    { h: "Situação", r: function (a) {
+        var e = ETAPAS_ANALISE[a.status] || ["—", "t-mut", ""];
+        return '<span class="tag ' + e[1] + '">' + e[0] + "</span>" +
+          (a.ma_referencia ? ' <span class="tag t-neg">má referência</span>' : "");
+      } },
+    { h: "Aberta em", r: function (a) { return fdate(a.criada); } },
+    { h: "Resultado", r: function (a) { return a.decidida ? fdate(a.decidida) + (a.motivo ? "<div class='sm mut'>" + esc(a.motivo) + "</div>" : "") : "—"; } }
+  ], srt(todas, function (a) { return a.criada_em || a.criada; }, true), "Nenhuma análise", function (a) { return "drawerAnalise('" + a.id + "')"; }));
+  return h;
+}
+
+/* ---------------- as visitas do vendedor, dentro do PDV ---------------- */
+function cardsVisita() {
+  var minhas = visitasDoVendedor(Sess.user_id);
+  if (!minhas.length) return "";
+  return '<div class="box" style="margin-bottom:20px"><div class="box-h">' +
+    "<div><h3>Visitas para fazer</h3><p>" + minhas.length + " cliente(s) esperando a sua entrevista</p></div></div>" +
+    '<div class="box-b"><div class="grid c2">' + minhas.map(function (a) {
+      var f = a.formulario || {};
+      var d = prazoVisita(a);
+      var prazo = d === null ? ""
+        : d < 0 ? '<span class="tag t-neg">' + Math.abs(d) + " dia(s) atrasada</span>"
+        : d === 0 ? '<span class="tag t-wr">vence hoje</span>'
+        : '<span class="tag t-inf">' + d + " dia(s)</span>";
+      var rest = f.cpf ? restricaoDoCpf(f.cpf) : null;
+      return '<div class="box" style="margin:0"><div class="box-b">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">' +
+        "<div><b style='font-size:15px'>" + esc(f.nome || a.nome) + "</b>" +
+        "<div class='sm mut'>" + ftel(f.telefone1 || a.telefone) + "</div></div>" + prazo + "</div>" +
+        (rest ? nota("<b>Má referência registrada</b> — " + esc(rest.motivo), "ng") : "") +
+        (f.endereco
+          ? '<div class="ln"><span class="k">Endereço</span><span class="v">' + esc(f.endereco) + "</span></div>" +
+            '<div class="ln"><span class="k">Bairro</span><span class="v">' + esc(f.bairro) + " · " + esc(f.cidade) + "</span></div>" +
+            '<div class="ln"><span class="k">Referência</span><span class="v">' + esc(f.referencia1 || "—") + "</span></div>" +
+            '<div class="ln"><span class="k">Trabalho</span><span class="v">' + esc(f.funcao || "—") + " · " + esc(f.empresa || "") + "</span></div>" +
+            '<div class="ln"><span class="k">Pedido</span><span class="v">' + esc(f.pedido || "—") +
+              (f.parcelas ? " · " + f.parcelas + "x de " + money(f.parcela_desejada) : "") + "</span></div>"
+          : '<div class="sm mut" style="margin:8px 0">O cliente ainda não preencheu o formulário.</div>') +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">' +
+        '<button class="btn btn-p btn-s" onclick="modalVisita(\'' + a.id + '\')">Registrar visita</button>' +
+        '<button class="btn btn-s" onclick="drawerAnalise(\'' + a.id + '\')">Ver ficha</button>' +
+        (f.telefone1 || a.telefone
+          ? '<a class="btn btn-s btn-g" target="_blank" rel="noopener" href="https://wa.me/55' +
+            esc(dig(f.telefone1 || a.telefone)) + '">WhatsApp</a>' : "") +
+        (f.endereco
+          ? '<a class="btn btn-s" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' +
+            encodeURIComponent([f.endereco, f.bairro, f.cidade].filter(Boolean).join(", ")) + '">Ver no mapa</a>' : "") +
+        "</div></div></div>";
+    }).join("") + "</div></div></div>";
+}
+
+
+/* =======================================================================
+   DO CRÉDITO APROVADO ATÉ A ENTREGA
+
+   Aprovar não é vender. Entre uma coisa e outra existe um caminho que
+   a loja já percorre na prática, e que agora fica visível:
+
+     aprovado → frete pago → entrega agendada → entregue
+
+   O frete é fixo, definido pela loja. O pagamento é feito pelo link ou
+   QR que o dono cadastra nas configurações — a Vyora não processa
+   dinheiro, não guarda cartão e não fica no meio da transação.
+
+   Quem confirma que o dinheiro entrou é uma pessoa da loja, olhando o
+   próprio banco. O sistema só registra quem confirmou e quando.
+   ======================================================================= */
+var FRETE_PADRAO = 70;
+function valorFrete() {
+  var c = cfg();
+  return c.frete_valor != null && c.frete_valor !== "" ? Number(c.frete_valor) : FRETE_PADRAO;
+}
+function linkPagamento() { return (cfg().pagamento_link || "").trim(); }
+
+var ETAPAS_ENTREGA = {
+  aprovado: ["Aguardando o frete", "t-wr"],
+  frete_pago: ["Frete pago", "t-inf"],
+  entrega_agendada: ["Entrega marcada", "t-inf"],
+  entregue: ["Entregue", "t-pos"]
+};
+function aprovadasSemFrete() {
+  return srt(analises().filter(function (a) { return a.status === "aprovado"; }), function (a) { return a.decidida; });
+}
+function comFretePago() {
+  return srt(analises().filter(function (a) { return a.status === "frete_pago"; }), function (a) { return a.frete_pago_em; });
+}
+function entregasMarcadas() {
+  return srt(analises().filter(function (a) { return a.status === "entrega_agendada"; }), function (a) { return a.entrega_data; });
+}
+function noCaminho() {
+  return analises().filter(function (a) {
+    return ["aprovado", "frete_pago", "entrega_agendada"].indexOf(a.status) >= 0;
+  });
+}
+
+/* ---------------- cobrar o frete ---------------- */
+function mensagemFrete(a) {
+  var f = a.formulario || {};
+  var link = linkPagamento();
+  return "Oi, " + String(f.nome || a.nome).split(" ")[0] + "! Seu crédito na " + org().nome +
+    " foi aprovado. Para agendarmos a entrega do seu " + (f.pedido || "produto") +
+    ", falta o frete de " + money(valorFrete()) + "." +
+    (link ? " Pague por aqui: " + link : "") +
+    " Assim que cair, marcamos a entrega com você.";
+}
+function modalFrete(id) {
+  var a = find(DB.analises, id);
+  if (!a) return;
+  var f = a.formulario || {};
+  var link = linkPagamento();
+  modal("Frete de " + esc(f.nome || a.nome),
+    (link ? "" : nota("<b>Nenhum link de pagamento cadastrado.</b> O administrador define em " +
+      "<b>Configurações › Sistema</b> — pode ser o link do Pix, do QR ou da maquininha.", "wr")) +
+    ln("Cliente", esc(f.nome || a.nome)) +
+    ln("Produto", esc(f.pedido || "—")) +
+    ln("Valor do frete", money(valorFrete())) +
+    (link ? ln("Link de pagamento", '<span class="mono sm">' + esc(link) + "</span>") : "") +
+    '<div class="fld" style="margin-top:14px"><label>Mensagem para o cliente</label>' +
+    '<textarea id="fr-msg" rows="5">' + esc(mensagemFrete(a)) + "</textarea></div>" +
+    nota("Confirme o pagamento só depois de ver o dinheiro na conta. A Vyora não recebe nada por você — " +
+      "quem confirma é você, e fica registrado no seu nome.", "inf"),
+    '<button class="btn" onclick="fecharModal()">Fechar</button>' +
+    (f.telefone1 || a.telefone
+      ? '<a class="btn btn-g" target="_blank" rel="noopener" href="https://wa.me/55' +
+        esc(dig(f.telefone1 || a.telefone)) + "?text=" + encodeURIComponent(mensagemFrete(a)) + '">Cobrar no WhatsApp</a>'
+      : "") +
+    '<button class="btn btn-p" onclick="confirmarFrete(\'' + id + '\')">Confirmar pagamento</button>');
+}
+function confirmarFrete(id) {
+  var a = find(DB.analises, id);
+  if (!a) return;
+  confirmar("Confirmar o pagamento do frete?",
+    "Você está dizendo que o valor de <b>" + money(valorFrete()) + "</b> já entrou na conta da loja. " +
+    "Isso libera o agendamento da entrega e fica registrado com o seu nome.", function () {
+      a.status = "frete_pago";
+      a.frete_valor = valorFrete();
+      a.frete_pago_em = new Date().toISOString();
+      a.frete_por = Sess.user_id;
+      a.etapas.push({ etapa: "frete_pago", em: a.frete_pago_em, por: Sess.user_id });
+      logar("Frete confirmado", (a.formulario || {}).nome || a.nome);
+      save(); fecharModal(); ir("vendas");
+      toast("Frete confirmado. Agora dá para marcar a entrega.", "ok");
+    }, "Confirmar");
+}
+
+/* ---------------- marcar a entrega ---------------- */
+function modalEntrega(id) {
+  var a = find(DB.analises, id);
+  if (!a) return;
+  var f = a.formulario || {};
+  modal("Entrega de " + esc(f.nome || a.nome),
+    ln("Produto", esc(f.pedido || "—")) +
+    ln("Endereço", esc(f.endereco || "—")) +
+    ln("Bairro", esc(f.bairro || "") + (f.cidade ? " · " + esc(f.cidade) : "")) +
+    ln("Referência", esc(f.referencia1 || "—")) +
+    '<div class="rw rw2" style="margin-top:14px">' +
+      '<div class="fld"><label>Data da entrega <span class="rq">*</span></label>' +
+        '<input id="en-data" type="date" value="' + esc(a.entrega_data || addD(today(), 2)) + '"></div>' +
+      '<div class="fld"><label>Período <span class="rq">*</span></label><select id="en-periodo">' +
+        ["Manhã (8h às 12h)", "Tarde (13h às 18h)", "Combinado por telefone"].map(function (p) {
+          return '<option' + (a.entrega_periodo === p ? " selected" : "") + ">" + esc(p) + "</option>";
+        }).join("") + "</select></div></div>" +
+    '<div class="fld"><label>Quem entrega</label><input id="en-quem" value="' + esc(a.entrega_quem || "") +
+      '" placeholder="Nome de quem vai levar"></div>' +
+    '<div class="fld"><label>Recado para o cliente</label>' +
+      '<textarea id="en-obs" rows="2" placeholder="Opcional">' + esc(a.entrega_obs || "") + "</textarea></div>" +
+    '<div id="en-err" class="note ng hidden"></div>',
+    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
+    '<button class="btn btn-p" onclick="salvarEntrega(\'' + id + '\')">Marcar entrega</button>');
+}
+function salvarEntrega(id) {
+  var a = find(DB.analises, id), err = el("en-err");
+  function bad(m) { err.innerHTML = "<span>" + ICON.alert + "</span><div>" + m + "</div>"; err.classList.remove("hidden"); }
+  var data = v("en-data");
+  if (!data) return bad("Escolha a data da entrega.");
+  if (data < today()) return bad("A data não pode ser no passado.");
+  a.status = "entrega_agendada";
+  a.entrega_data = data;
+  a.entrega_periodo = v("en-periodo");
+  a.entrega_quem = v("en-quem");
+  a.entrega_obs = v("en-obs");
+  a.entrega_por = Sess.user_id;
+  a.etapas.push({ etapa: "entrega_agendada", em: new Date().toISOString(), por: Sess.user_id });
+  logar("Entrega marcada", ((a.formulario || {}).nome || a.nome) + " · " + fdate(data));
+  save(); fecharModal(); ir("vendas");
+  modalMensagemEntrega(id);
+}
+function mensagemEntrega(a) {
+  var f = a.formulario || {};
+  return "Oi, " + String(f.nome || a.nome).split(" ")[0] + "! Sua entrega da " + org().nome +
+    " está marcada para " + fdate(a.entrega_data) + ", no período da " +
+    String(a.entrega_periodo || "").toLowerCase() + ". Produto: " + (f.pedido || "seu pedido") + "." +
+    (a.entrega_quem ? " Quem vai levar é " + a.entrega_quem + "." : "") +
+    (a.entrega_obs ? " " + a.entrega_obs : "") +
+    " Precisa ter alguém em casa para receber. Qualquer coisa, é só chamar aqui.";
+}
+function modalMensagemEntrega(id) {
+  var a = find(DB.analises, id);
+  if (!a) return;
+  var f = a.formulario || {};
+  var msg = mensagemEntrega(a);
+  modal("Avisar o cliente",
+    nota("Entrega marcada para <b>" + fdate(a.entrega_data) + "</b>, " +
+      esc(String(a.entrega_periodo || "").toLowerCase()) + ". Mande a mensagem abaixo para ele se organizar.", "inf") +
+    '<div class="fld"><label>Mensagem</label><textarea id="me-msg" rows="6">' + esc(msg) + "</textarea></div>",
+    '<button class="btn" onclick="copiar(document.getElementById(\'me-msg\').value)">Copiar</button>' +
+    (f.telefone1 || a.telefone
+      ? '<a class="btn btn-g" target="_blank" rel="noopener" href="https://wa.me/55' +
+        esc(dig(f.telefone1 || a.telefone)) + "?text=" + encodeURIComponent(msg) + '">Enviar no WhatsApp</a>'
+      : "") +
+    '<button class="btn btn-p" onclick="fecharModal()">Pronto</button>');
+}
+function marcarEntregue(id) {
+  var a = find(DB.analises, id);
+  if (!a) return;
+  confirmar("Confirmar que foi entregue?",
+    "O produto saiu e chegou ao cliente. A partir daqui, a análise sai do painel de acompanhamento.", function () {
+      a.status = "entregue";
+      a.entregue_em = today();
+      a.entregue_por = Sess.user_id;
+      a.etapas.push({ etapa: "entregue", em: new Date().toISOString(), por: Sess.user_id });
+      logar("Entrega concluída", (a.formulario || {}).nome || a.nome);
+      save(); fecharModal(); ir("vendas"); toast("Entrega registrada.", "ok");
+    }, "Confirmar");
+}
+
+/* ---------------- o painel dentro de Vendas ---------------- */
+function painelCrediario() {
+  var fila = noCaminho();
+  if (!fila.length) return "";
+  var semFrete = aprovadasSemFrete(), pagos = comFretePago(), marcadas = entregasMarcadas();
+
+  function cartao(a, acoes) {
+    var f = a.formulario || {};
+    var e = ETAPAS_ENTREGA[a.status] || ["—", "t-mut"];
+    return '<div class="box" style="margin:0"><div class="box-b">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">' +
+      "<div><b style='font-size:14.5px'>" + esc(f.nome || a.nome) + "</b>" +
+      "<div class='sm mut'>" + esc(f.pedido || "—") +
+        (f.parcelas ? " · " + f.parcelas + "x de " + money(f.parcela_desejada) : "") + "</div></div>" +
+      '<span class="tag ' + e[1] + '">' + e[0] + "</span></div>" +
+      (a.status === "entrega_agendada"
+        ? '<div class="ln"><span class="k">Entrega</span><span class="v">' + fdate(a.entrega_data) +
+          " · " + esc(a.entrega_periodo || "") + "</span></div>" +
+          (a.entrega_quem ? '<div class="ln"><span class="k">Quem leva</span><span class="v">' + esc(a.entrega_quem) + "</span></div>" : "")
+        : '<div class="ln"><span class="k">Endereço</span><span class="v">' + esc(f.bairro || "—") +
+          (f.cidade ? " · " + esc(f.cidade) : "") + "</span></div>") +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' + acoes + "</div>" +
+      "</div></div>";
+  }
+
+  var h = '<div class="box" style="margin-bottom:20px"><div class="box-h">' +
+    "<div><h3>Do crédito aprovado até a entrega</h3><p>" + fila.length +
+    " cliente(s) no caminho · frete de " + money(valorFrete()) + "</p></div>" +
+    (isAdmin() && !linkPagamento()
+      ? '<div class="act"><button class="btn btn-s" onclick="ir(\'config\',{tab:\'sistema\'})">Cadastrar link de pagamento</button></div>'
+      : "") + "</div><div class='box-b'>";
+
+  if (semFrete.length) {
+    h += '<div class="sm mut" style="margin-bottom:10px"><b>Aprovados, esperando o frete</b> — ' +
+      semFrete.length + " cliente(s)</div>" +
+      '<div class="grid c3" style="margin-bottom:18px">' + semFrete.map(function (a) {
+        return cartao(a, '<button class="btn btn-p btn-s" onclick="modalFrete(\'' + a.id + '\')">Cobrar frete</button>' +
+          '<button class="btn btn-s" onclick="drawerAnalise(\'' + a.id + '\')">Ver ficha</button>');
+      }).join("") + "</div>";
+  }
+  if (pagos.length) {
+    h += '<div class="sm mut" style="margin-bottom:10px"><b>Frete pago, esperando data</b> — ' +
+      pagos.length + " cliente(s)</div>" +
+      '<div class="grid c3" style="margin-bottom:18px">' + pagos.map(function (a) {
+        return cartao(a, '<button class="btn btn-p btn-s" onclick="modalEntrega(\'' + a.id + '\')">Marcar entrega</button>' +
+          '<button class="btn btn-s" onclick="drawerAnalise(\'' + a.id + '\')">Ver ficha</button>');
+      }).join("") + "</div>";
+  }
+  if (marcadas.length) {
+    h += '<div class="sm mut" style="margin-bottom:10px"><b>Entregas marcadas</b> — ' +
+      marcadas.length + " para sair</div>" +
+      '<div class="grid c3">' + marcadas.map(function (a) {
+        return cartao(a, '<button class="btn btn-p btn-s" onclick="marcarEntregue(\'' + a.id + '\')">Foi entregue</button>' +
+          '<button class="btn btn-s" onclick="modalMensagemEntrega(\'' + a.id + '\')">Avisar de novo</button>' +
+          '<button class="btn btn-s" onclick="modalEntrega(\'' + a.id + '\')">Remarcar</button>');
+      }).join("") + "</div>";
+  }
+  return h + "</div></div>";
+}
 (function () {
   if (!load()) seed();
   if (!DB.rede) DB.rede = { buscar_ativo: false, minimo_empresas: 3 };
   if (!Array.isArray(DB.removidos)) DB.removidos = [];
   ["tenants", "config", "users", "customers", "products", "moves", "sales", "parcels", "cash", "metas",
     "cobrancas", "acordos", "leads", "faturas", "tickets", "growth", "logs", "planos", "solicitacoes",
-    "implantacoes", "contratos", "sessoes", "despesas"].forEach(function (c) { if (!Array.isArray(DB[c])) DB[c] = []; });
+    "implantacoes", "contratos", "sessoes", "despesas", "analises", "restricoes"].forEach(function (c) { if (!Array.isArray(DB[c])) DB[c] = []; });
   /* o console escreve no mesmo DB.global — complete só o que faltar, sem apagar nada */
   if (!DB.global) DB.global = {};
   var PADRAO_GLOBAL = { senha_min: 6, token_meses: 3, token_graca_dias: 7, dias_suspensao: 60 };
@@ -7169,6 +8072,7 @@ cuidarDoAmbiente = function () {
       "<p style='margin:0;color:#4a4a4a'>Baixe o arquivo de novo e abra com <b>Ctrl+F5</b>. Nenhum dado foi perdido.</p></div>";
     return;
   }
+  ouvirOutrasAbas();
   renderLogin();
   if (restaurar()) iniciarApp();
   setInterval(function () {

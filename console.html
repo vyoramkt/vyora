@@ -2345,7 +2345,9 @@ function provisionar(t, senhaEscolhida) {
 function modalCredenciais(id) {
   var t = find(DB.tenants, id);
   var adm = DB.users.filter(function (u) { return u.tenant_id === id && u.perfil === "admin"; })[0];
-  var pend = adm ? (credencialPendente(adm) || t.senha_provisoria) : null;
+  /* a temporária só aparece enquanto ninguém entrou. Depois que a pessoa
+     definiu a senha dela, essa senha não existe mais em lugar nenhum. */
+  var pend = adm ? credencialPendente(adm) : null;
   modal("Acesso de " + esc(t.nome),
     nota("Envie estes dados ao cliente. A <b>senha é temporária</b>: no primeiro acesso o sistema obriga a troca, e a partir daí nem você consegue vê-la.", "wr") +
     '<div class="ln"><span class="k">Endereço</span><span class="v">' + esc(t.slug) + ".vyora.com.br</span></div>" +
@@ -4370,6 +4372,14 @@ function pg_acessos() {
 (function () {
   if (!load()) seedConsole();
   if (!Array.isArray(DB.removidos)) DB.removidos = [];
+  /* o console também divide o banco com as outras abas: sem escutar as
+     mudanças, a aba antiga apaga o que a nova cadastrou */
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("storage", function (e) {
+      if (!e || e.key !== KEY) return;
+      try { if (load() && Sess && View.pg) ir(View.pg, View.p); } catch (err) {}
+    });
+  }
   migrar();
   migrarSenhas();
   var trocados = renovarTokensVencidos();

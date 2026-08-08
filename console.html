@@ -1165,12 +1165,6 @@ function vagasRede(t) {
   var lim = limiteEmpresas(t), uso = daRede(t.id).length;
   return { uso: uso, limite: lim, livres: Math.max(0, lim - uso), cheia: uso >= lim };
 }
-function redeDe(tid) {
-  var t = find(DB.tenants, tid);
-  if (!t) return null;
-  if (ehHolding(t)) return t;
-  return t.matriz_id ? find(DB.tenants, t.matriz_id) : null;
-}
 function ativas() { return empresas().filter(function (t) { return t.situacao === "ativa"; }); }
 function implantando() { return empresas().filter(function (t) { return ETAPAS.indexOf(t.situacao) >= 0 && t.situacao !== "ativa"; }); }
 
@@ -2140,7 +2134,6 @@ function modalEmpresa(id, rede) {
     '<button class="btn" onclick="fecharModal()">Cancelar</button><button class="btn btn-p" onclick="salvarEmpresa(' +
     (t ? "'" + t.id + "'" : "") + ')">' + (t ? "Salvar" : "Cadastrar empresa") + "</button>", true);
 }
-function filhasDe(id) { return DB.tenants.filter(function (x) { return x.matriz_id === id; }); }
 function grupoResumo(t) {
   if (ehHolding(t)) {
     var vg = vagasRede(t);
@@ -3643,7 +3636,13 @@ function salvarSupabase() {
   save(); toast("Conexão salva.", "ok"); ir("leads");
 }
 function supaAutenticado() { return !!SUPA_TOKEN && Date.now() < SUPA_EXP; }
-function supaSair() { SUPA_TOKEN = null; SUPA_EXP = 0; SUPA_USER = ""; esquecerSessaoSupa(); ir("leads"); }
+function supaSair() {
+  SUPA_TOKEN = null; SUPA_EXP = 0; SUPA_USER = "";
+  esquecerSessaoSupa();
+  try { Store.del(K_MAPA_ENVIADO); } catch (e) {}
+  auditar("Console desconectado do servidor", "", "");
+  ir("acessos");
+}
 var SUPA_SESS = "vyora_supa_sess";
 /* guardar a sessão neste navegador é seguro: fica na máquina, não no arquivo
    publicado. Senha nunca é gravada — o que fica é um token renovável. */
@@ -4415,26 +4414,27 @@ function pg_acessos() {
     "servidor, não o arquivo. Suspender um acesso aqui corta o alcance <b>na hora</b>, em qualquer aparelho.", "");
   if (senhaNaoTrocou) {
     h += '<div style="height:14px"></div>' +
-      nota("<b>Atenção: a senha de " + esc(senhaNaoTrocou) + " não foi trocada no servidor.</b><br>" +
-        "A conta dessa pessoa já existia lá com outra senha. Trocar a senha de alguém exige a função " +
-        "<b>redefinir-senha</b> no Supabase — se ela ainda não foi publicada, é isso que está faltando " +
-        "(Edge Functions no painel).<br><br>" +
-        "<b>Alternativa manual:</b> Supabase › <b>Authentication › Users</b>, apague esse usuário, volte " +
-        "aqui e clique em <b>Criar os acessos que faltam</b>.", "wr");
+      nota("<b>A senha de " + esc(senhaNaoTrocou) + " não foi trocada no servidor.</b><br>" +
+        "A conta já existia lá com outra senha, e o servidor recusou a troca. " +
+        "Quase sempre é a função <b>redefinir-senha</b> desatualizada — republique em Edge Functions e tente de novo.", "wr");
   }
+  /* publicar deixou de ser tarefa de alguém: acontece ao abrir o console
+     e a cada minuto, quando alguma coisa muda. Os botões continuam para
+     forçar na hora — mas ninguém precisa lembrar deles. */
+  var emDia = Store.get(K_MAPA_ENVIADO) === retratoDaRede();
   h += '<div style="height:14px"></div>' +
-    box("Mapa da rede no servidor", '<div class="box-b">' +
-      '<div class="sm mut" style="margin-bottom:12px">É por este mapa que o servidor sabe quais empresas somar ' +
-      "para cada gestor de rede. Empresas novas entram sozinhas na liberação do ambiente; use o botão abaixo " +
-      "para publicar de uma vez as que já existiam.</div>" +
-      '<button class="btn" onclick="publicarMapaDaRede()">Publicar o mapa agora</button></div>');
-  h += '<div style="height:14px"></div>' +
-    box("Ambientes prontos para o primeiro acesso", '<div class="box-b">' +
-      '<div class="sm mut" style="margin-bottom:12px">Para o cliente entrar do computador dele, o ambiente da empresa ' +
-      "precisa existir no servidor. Empresas liberadas de agora em diante já saem publicadas; use o botão abaixo " +
-      "para as que foram liberadas antes.</div>" +
-      '<button class="btn" onclick="publicarAmbientesTodos()">Publicar os ambientes agora</button>' +
-      '<button class="btn" style="margin-left:8px" onclick="criarAcessosQueFaltam()">Criar os acessos que faltam</button></div>');
+    box("O que está no servidor", '<div class="box-b">' +
+      nota(emDia
+        ? "<b>Tudo publicado.</b> O mapa das empresas e os ambientes no servidor estão iguais ao que existe aqui."
+        : "<b>Tem coisa para subir.</b> Vai sozinho em instantes — o console publica ao abrir e a cada minuto, " +
+          "sempre que alguma coisa muda. Se quiser não esperar, use o botão.", emDia ? "ok" : "wr") +
+      '<div class="sm mut" style="margin:12px 0">O <b>mapa</b> diz ao servidor quais empresas somar para cada gestor de rede, ' +
+      "e leva o token e o e-mail do dono — é isso que permite um acesso perdido se religar sozinho. " +
+      "O <b>ambiente</b> é o que deixa o cliente entrar de um computador que nunca viu o sistema. " +
+      "Senha nenhuma vai em nenhum dos dois.</div>" +
+      '<button class="btn" onclick="publicarMapaDaRede();publicarAmbientesTodos()">Publicar agora</button>' +
+      '<button class="btn" style="margin-left:8px" onclick="criarAcessosQueFaltam()">Criar os acessos que faltam</button>' +
+      '<button class="btn btn-s" style="margin-left:8px" onclick="supaSair()">Desconectar do Supabase</button></div>');
   setTimeout(carregarCopiasVyora, 0);
   h += '<div style="height:14px"></div>' +
     box("Cópias de segurança das empresas", '<div class="box-b">' +

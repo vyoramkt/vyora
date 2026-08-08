@@ -5256,7 +5256,13 @@ function pg_config(p) {
         ((t.token_historico || []).length ? '<div class="sm mut" style="margin-top:16px">Trocas anteriores</div>' +
           t.token_historico.slice().reverse().slice(0, 4).map(function (x) {
             return '<div class="ln"><span class="k mono">' + esc(x.token || "—") + '</span><span class="v sm">' + fdate(x.ate) + " · " + esc(x.motivo) + "</span></div>";
-          }).join("") : "") + "</div>") + "</div>";
+          }).join("") : "") + "</div>") +
+      (isAdmin() ? box("Este computador", '<div class="box-b">' +
+        '<div class="sm mut" style="margin-bottom:14px">Computador vendido, devolvido ou de alguém que saiu da empresa? ' +
+        "Remover o ambiente apaga <b>tudo desta empresa desta máquina</b>: cadastros, vendas, financeiro e a lista de acessos. " +
+        "O que já foi sincronizado continua no servidor e volta em qualquer outro aparelho — mas o que ainda estiver esperando para subir " +
+        "se perde. Confira a barra do topo antes.</div>" +
+        '<button class="btn btn-d" onclick="modalRemoverAmbiente()">Remover este ambiente do computador</button></div>') : "") + "</div>";
   }
   h += "</div></div>";
   return h;
@@ -5953,6 +5959,56 @@ function esquecerEmpresa(id) {
 }
 function lembrarEmpresa(id) {
   DB.removidos = (DB.removidos || []).filter(function (x) { return x !== id; });
+}
+/* tirar a empresa DESTE computador. Não apaga nada no servidor: o que
+   já subiu continua lá e volta em qualquer outro aparelho. O que ainda
+   estava na fila, esse sim se perde — por isso avisamos antes. */
+function modalRemoverAmbiente() {
+  if (!isAdmin()) return toast("Apenas o administrador pode remover o ambiente.", "err");
+  var t = org(), fila = SYNC.fila || 0;
+  modal("Remover " + esc(t.nome) + " deste computador",
+    nota("Tudo desta empresa sai <b>desta máquina</b>: cadastros, vendas, financeiro, equipe e o registro local. " +
+      "Nada é apagado no servidor.", "wr") +
+    (fila || !SYNC.ligado
+      ? nota("<b>Espere.</b> " + (SYNC.ligado
+          ? "Ainda tem " + fila + " alteração(ões) esperando para subir."
+          : "A sincronização está desligada, então pode haver trabalho aqui que nunca chegou ao servidor.") +
+        " Se remover agora, isso se perde.", "ng")
+      : nota("A sincronização está em dia. Tudo o que existe aqui já está no servidor.", "ok")) +
+    '<div class="fld" style="margin-top:16px"><label>Para confirmar, escreva o nome da empresa <span class="rq">*</span></label>' +
+    '<input id="rm-nome" autocomplete="off" placeholder="' + esc(t.nome) + '"></div>' +
+    '<div id="rm-err" class="note ng hidden"></div>',
+    '<button class="btn" onclick="fecharModal()">Cancelar</button>' +
+    '<button class="btn btn-d" onclick="removerAmbienteDoComputador()">Remover deste computador</button>');
+}
+function removerAmbienteDoComputador() {
+  if (!isAdmin()) return;
+  var t = org(), err = el("rm-err");
+  if (String(v("rm-nome")).trim().toLowerCase() !== String(t.nome).trim().toLowerCase()) {
+    err.innerHTML = "<span>" + ICON.alert + "</span><div>O nome não confere. Escreva exatamente <b>" + esc(t.nome) + "</b>.</div>";
+    err.classList.remove("hidden");
+    return;
+  }
+  var id = t.id;
+  esquecerEmpresa(id);
+  /* toda coleção que tem dono sai junto — inclusive as que ainda nem
+     existiam quando esta função foi escrita */
+  for (var col in DB) {
+    if (!DB.hasOwnProperty(col) || !Array.isArray(DB[col]) || col === "removidos") continue;
+    DB[col] = DB[col].filter(function (x) { return !x || x.tenant_id !== id; });
+  }
+  DB.tenants = (DB.tenants || []).filter(function (x) { return x.id !== id; });
+  /* o espelho e o relógio da sincronização também: senão o próximo
+     ambiente instalado aqui herdaria a memória do anterior */
+  try {
+    var esp = espelho(); for (var e in esp) delete esp[e]; Store.set(K_ESPELHO, JSON.stringify(esp));
+    Store.set(K_RELOGIO, JSON.stringify({}));
+    Store.del(K_AMB); Store.del(K_TELA);
+  } catch (x) {}
+  nuvemEsquecer();
+  Store.del(SKEY); Sess = null;
+  save();
+  location.reload();
 }
 
 /* ---------------- o que mudou lá ---------------- */
@@ -7112,6 +7168,10 @@ function entrarComAmbienteNovo() {
         return bad("Não conseguimos abrir este ambiente. Confira o token com quem administra o sistema — " +
           "e, se ele estiver certo, avise a Vyora que o ambiente da empresa ainda não foi publicado.");
       }
+      /* esta empresa pode ter sido removida deste computador um dia. Quem
+         digita o token e entra com o próprio acesso está decidindo trazê-la
+         de volta — a trava existe contra a sincronização, não contra a dona. */
+      lembrarEmpresa(pac.tenant.id);
       instalarAmbiente(pac);
       /* tem que ser alguém DESTA empresa: o mesmo e-mail pode existir em
          outra que já esteja instalada neste computador */

@@ -1508,7 +1508,13 @@ function iniciar() {
   /* a conexão com o servidor volta aqui, uma vez, para o console inteiro.
      Assim nenhuma tela precisa pedir login de novo — nem Leads, nem Acessos. */
   if (!supaAutenticado() && sessaoSupaGuardada()) {
-    religarSupabase(function (ok) { if (ok && View.pg) ir(View.pg, View.p); });
+    religarSupabase(function (ok) {
+      if (!ok) return;
+      publicarTudoSozinho();
+      if (View.pg) ir(View.pg, View.p);
+    });
+  } else if (supaAutenticado()) {
+    publicarTudoSozinho();
   }
   ir("exec");
 }
@@ -3666,6 +3672,7 @@ function supaEntrar(volta) {
     .then(function (x) {
       if (!x.ok || !x.j.access_token) return bad(x.j.error_description || x.j.msg || "Não foi possível entrar. Confira o e-mail e a senha.");
       guardarSessaoSupa(x.j, mail);
+      publicarTudoSozinho();
       ir(volta || "leads");
     }).catch(function () { bad("Sem resposta do Supabase. Verifique a URL do projeto e a sua internet."); });
 }
@@ -4161,23 +4168,34 @@ function publicarAmbientesTodos() {
    Quem é matriz de quem não pode ser decidido pelo navegador do
    cliente. O console publica esse mapa; é ele que o servidor usa
    para somar os números que o gestor da rede recebe. */
+/* o administrador da empresa: é o único e-mail que consegue refazer
+   o próprio vínculo pelo token quando não há ambiente publicado */
+function adminDaEmpresa(t) {
+  var l = DB.users.filter(function (u) {
+    return u.tenant_id === t.id && u.status !== "inativo" &&
+      (u.perfil === "admin" || u.perfil === "holding");
+  });
+  return l[0] ? String(l[0].email || "").toLowerCase() : null;
+}
+function linhaEmpresaNuvem(t) {
+  return {
+    tenant_id: t.id, nome: t.nome, matriz_id: t.matriz_id || null,
+    ativo: t.status === "ativo",
+    token: t.token || null, email_admin: adminDaEmpresa(t)
+  };
+}
 function registrarEmpresaNuvem(t, depois) {
   if (!supaConfigurado() || !supaAutenticado() || !t) return depois && depois(false);
   supaPedido("/rest/v1/empresas", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({
-      tenant_id: t.id, nome: t.nome, matriz_id: t.matriz_id || null,
-      ativo: t.status === "ativo"
-    })
+    body: JSON.stringify(linhaEmpresaNuvem(t))
   }).then(function (r) { if (depois) depois(r.ok); })
     .catch(function () { if (depois) depois(false); });
 }
 function publicarMapaDaRede() {
   if (!supaConfigurado() || !supaAutenticado()) return toast("Conecte a sua conta do Supabase nesta tela primeiro.", "err");
-  var lista = DB.tenants.filter(function (t) { return t.id !== "vyora"; }).map(function (t) {
-    return { tenant_id: t.id, nome: t.nome, matriz_id: t.matriz_id || null, ativo: t.status === "ativo" };
-  });
+  var lista = DB.tenants.filter(function (t) { return t.id !== "vyora"; }).map(linhaEmpresaNuvem);
   if (!lista.length) return toast("Nenhuma empresa cadastrada ainda.", "err");
   supaPedido("/rest/v1/empresas", {
     method: "POST",
@@ -4190,19 +4208,72 @@ function publicarMapaDaRede() {
   }).catch(function () { toast("Sem resposta do Supabase.", "err"); });
 }
 
+/* ---------------- publicar deixou de ser tarefa de alguém ----------------
+   Publicar o mapa e os ambientes nunca foi uma decisão: é só o que
+   precisa estar lá para o cliente conseguir entrar. Então acontece
+   sozinho, sempre que o console está conectado e alguma coisa mudou.
+   Os botões continuam existindo para forçar na hora — mas ninguém
+   precisa lembrar deles. */
+var K_MAPA_ENVIADO = "vyora_mapa_enviado";
+function retratoDaRede() {
+  return JSON.stringify(DB.tenants.filter(function (t) { return t.id !== "vyora"; })
+    .map(function (t) {
+      var l = linhaEmpresaNuvem(t);
+      return [l.tenant_id, l.nome, l.matriz_id, l.ativo, l.token, l.email_admin,
+        DB.users.filter(function (u) { return u.tenant_id === t.id; })
+          .map(function (u) { return u.id + ":" + u.email + ":" + u.perfil + ":" + u.status; }).join(",")].join("|");
+    }).sort());
+}
+function publicarTudoSozinho() {
+  if (!supaConfigurado() || !supaAutenticado()) return;
+  var agora = retratoDaRede();
+  if (Store.get(K_MAPA_ENVIADO) === agora) return;
+  var empresasLinhas = DB.tenants.filter(function (t) { return t.id !== "vyora"; }).map(linhaEmpresaNuvem);
+  if (!empresasLinhas.length) return;
+  supaPedido("/rest/v1/empresas", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(empresasLinhas)
+  }).then(function (r) {
+    if (!r.ok) return;
+    var amb = DB.tenants.filter(function (t) { return t.id !== "vyora" && t.provisionado; })
+      .map(function (t) { return { tenant_id: t.id, dados: pacoteAmbienteConsole(t) }; });
+    if (!amb.length) { try { Store.set(K_MAPA_ENVIADO, agora); } catch (e) {} return; }
+    supaPedido("/rest/v1/ambientes", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(amb)
+    }).then(function (r2) {
+      if (r2.ok) { try { Store.set(K_MAPA_ENVIADO, agora); } catch (e) {} }
+    }).catch(function () {});
+  }).catch(function () {});
+}
+
 /* ---------------- acesso na nuvem criado sozinho ----------------
    Ao provisionar a empresa, a conta de acesso do administrador dela
    nasce no Supabase junto com o ambiente. Você não abre o painel. */
 /* pedir ao servidor que troque a senha de alguém. A permissão é
    conferida lá dentro: a Vyora alcança qualquer pessoa, o admin de
    uma empresa só alcança a equipe dele. */
-function redefinirSenhaNuvemConsole(email, senha, depois) {
+/* o "de onde" vai junto: se a conta existir no Auth mas tiver perdido
+   o vínculo com a empresa, o servidor refaz o vínculo na mesma chamada
+   em vez de responder "não encontramos esse acesso" e parar tudo */
+function redefinirSenhaNuvemConsole(email, senha, depois, empresa, papel) {
   var c = supaCfg();
   if (typeof fetch !== "function" || !c.url || !supaAutenticado()) return depois && depois(false, "console desconectado do servidor");
+  var pessoa = DB.users.filter(function (u) { return String(u.email || "").toLowerCase() === String(email).toLowerCase(); })[0];
+  var alvo = empresa || (pessoa && pessoa.tenant_id) || null;
+  var corpo = { email: String(email).toLowerCase(), senha: senha };
+  if (alvo) {
+    var p = papel || (pessoa && pessoa.perfil) || "vendedor";
+    corpo.tenant_id = alvo;
+    corpo.perfil = p === "holding" ? "holding" : p === "admin" ? "admin" : "vendedor";
+    corpo.nome = (pessoa && pessoa.nome) || email;
+  }
   fetch(c.url + "/functions/v1/redefinir-senha", {
     method: "POST",
     headers: { apikey: c.key, Authorization: "Bearer " + SUPA_TOKEN, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: String(email).toLowerCase(), senha: senha })
+    body: JSON.stringify(corpo)
   }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
     .then(function (x) { if (depois) depois(!!(x.ok && x.j && x.j.ok), x.j && x.j.erro); })
     .catch(function () { if (depois) depois(false, "sem resposta do servidor"); });
@@ -4229,12 +4300,18 @@ function criarContaNuvemConsole(email, senha, tenantId, papel, nome, depois) {
          não muda a senha: quem muda é a função do servidor. */
       var ident = (x.j.user && x.j.user.identities) || x.j.identities;
       if (Array.isArray(ident) && ident.length === 0) {
-        redefinirSenhaNuvemConsole(email, senha, function (deu, motivo) {
-          if (deu) return;
+        /* conta que já existe: o id devolvido aqui não é confiável, então
+           não gravamos perfil com ele. Quem troca a senha E refaz o
+           vínculo, com o id de verdade, é a função do servidor. */
+        return redefinirSenhaNuvemConsole(email, senha, function (deu, motivo) {
+          if (deu) {
+            auditar("Acesso na nuvem religado", email, tenantId + " · " + papel);
+            return fim(true);
+          }
           senhaNaoTrocou = email;
-          toast("O acesso de " + email + " já existia com outra senha e não consegui trocá-la" +
-            (motivo ? " (" + motivo + ")" : "") + ". Veja o aviso na tela.", "err");
-        });
+          fim(false, "O acesso de " + email + " já existia e não consegui repará-lo" +
+            (motivo ? " (" + motivo + ")" : "") + ".");
+        }, tenantId, papel);
       }
       supaPedido("/rest/v1/perfis", {
         method: "POST",
@@ -4412,8 +4489,12 @@ function pg_acessos() {
   setInterval(function () {
     if (!Sess) return;
     atualizarSituacoes(); tocarSessao();
+    /* e o que precisa estar no servidor vai para o servidor. Se nada
+       mudou, isto não faz pedido nenhum — compara e desiste. */
+    publicarTudoSozinho();
   }, 60000);
 })();
+
 </script>
 </body>
 </html>

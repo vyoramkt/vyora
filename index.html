@@ -2056,18 +2056,22 @@ function ir(pg, p) {
   if (Tour.chave) fecharTour(false);
   el("nav").classList.remove("open");
   el("me-pop").classList.add("hidden");
-  window.scrollTo(0, 0);
   montarMenu();
   var t = TITULOS[pg] || [pg, ""];
   el("bar-t").textContent = t[0];
   el("bar-s").textContent = org().nome + " · " + t[1];
   var fn = window["pg_" + pg];
   var ok = pg === "assinatura" ? isAdmin() : podeVer(pg);
-  if (!ok) { el("page").innerHTML = semAcesso(); return; }
+  /* subir a tela só DEPOIS de trocar o conteúdo. Subindo antes, o
+     navegador mantinha a rolagem antiga quando a tela nova era mais
+     alta — e a pessoa clicava no menu, a tela trocava no meio, e
+     parecia que o clique não tinha funcionado. */
+  if (!ok) { el("page").innerHTML = semAcesso(); window.scrollTo(0, 0); return; }
   if (typeof fn !== "function") {
     el("page").innerHTML = telaDeErro("Módulo não encontrado",
       "A tela <b>" + esc(pg) + "</b> não existe neste arquivo. Provavelmente é uma versão incompleta do sistema.",
       "Baixe o arquivo novamente e abra com Ctrl+F5.");
+    window.scrollTo(0, 0);
     return;
   }
   try {
@@ -2078,8 +2082,10 @@ function ir(pg, p) {
     el("page").innerHTML = telaDeErro("Erro ao montar a tela",
       esc(e && e.message ? e.message : String(e)), "O restante do sistema continua funcionando.");
     logar("Erro de tela", pg + " · " + (e && e.message ? e.message : e));
+    window.scrollTo(0, 0);
     return;
   }
+  window.scrollTo(0, 0);
   var pos = window["after_" + pg];
   if (pos) setTimeout(function () { try { pos(View.p); } catch (e) {} }, 40);
 }
@@ -5812,19 +5818,51 @@ function religarNuvem(depois) {
       confirmarPerfilNuvem(depois);
     }).catch(function () { SYNC.estado = "offline"; if (depois) depois(false); });
 }
-/* o servidor diz de qual empresa a pessoa é — o arquivo não escolhe */
-function confirmarPerfilNuvem(depois) {
+/* o servidor diz de qual empresa a pessoa é — o arquivo não escolhe.
+   Se ele não souber responder, não desistimos: refazemos o vínculo e
+   perguntamos de novo. É isso que faz a sincronização ligar sozinha,
+   sem console, sem botão e sem ninguém entender de banco de dados. */
+function confirmarPerfilNuvem(depois, jaTentou) {
   nuvemPedido("/rest/v1/perfis?select=tenant_id,perfil,ativo", { method: "GET" })
     .then(function (r) { return r.ok ? r.json() : []; })
     .then(function (l) {
       var p = (l || [])[0];
-      if (!p || !p.ativo) { SYNC.ligado = false; SYNC.estado = "sem-perfil"; return depois && depois(false); }
+      if (!p || !p.ativo) {
+        if (!jaTentou) {
+          SYNC.estado = "reparando"; pintarSync();
+          return vincularAcessoNuvem(function (deu) {
+            if (deu) return confirmarPerfilNuvem(depois, true);
+            SYNC.ligado = false; SYNC.estado = "sem-perfil"; pintarSync();
+            if (depois) depois(false);
+          });
+        }
+        SYNC.ligado = false; SYNC.estado = "sem-perfil"; pintarSync();
+        return depois && depois(false);
+      }
       SYNC.tenant = p.tenant_id; SYNC.perfil = p.perfil;
       SYNC.ligado = true; SYNC.estado = "ligado";
       pintarSync();
       sincronizar();
+      /* o ambiente sobe junto: é ele que deixa o próximo aparelho —
+         e o resto da equipe — entrar sem depender de ninguém */
+      publicarAmbiente();
       if (depois) depois(true);
     }).catch(function () { SYNC.estado = "offline"; if (depois) depois(false); });
+}
+/* religar a conta à empresa. Não cria conta, não troca senha: só
+   refaz o laço, e só consegue quem já entrou como a pessoa E sabe o
+   token da empresa. Ter as duas coisas é ter o acesso de qualquer jeito. */
+function vincularAcessoNuvem(depois) {
+  var s = nuvemSessao(), t = null;
+  try { t = org(); } catch (e) { t = null; }
+  if (!podeNuvem() || !nuvemViva() || !s || !s.email || !t || !t.token) return depois && depois(false);
+  fetch(SUPA_URL + "/functions/v1/redefinir-senha", {
+    method: "POST",
+    headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SYNC.token, "Content-Type": "application/json" },
+    body: JSON.stringify({ acao: "vincular", email: String(s.email).toLowerCase(), token: t.token })
+  }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (x) { if (depois) depois(!!(x.ok && x.j && x.j.ok), x.j && x.j.erro); })
+    .catch(function () { if (depois) depois(false); });
 }
 function nuvemPedido(caminho, opcoes) {
   var o = opcoes || {};
@@ -6158,6 +6196,7 @@ function textoSync() {
     if (SYNC.estado === "desencontrada") return ["Sincronização parada", "o acesso na nuvem precisa de reparo"];
     if (SYNC.estado === "sem-perfil") return ["Só neste computador", "sem acesso na nuvem para este login"];
     if (SYNC.estado === "sem-conta") return ["Ligando a sincronização…", "criando o acesso na nuvem"];
+    if (SYNC.estado === "reparando") return ["Ligando a sincronização…", "religando este acesso à empresa"];
     return ["Só neste computador", "sincronização desligada"];
   }
   if (SYNC.estado === "offline") return ["Trabalhando offline", SYNC.fila + " alteração(ões) esperando"];
@@ -7397,7 +7436,15 @@ function buscarLinkLoja() {
     .catch(function () { LINK_LOJA.buscando = false; });
 }
 function criarLinkLoja() {
-  if (!nuvemViva()) return toast("Precisa estar conectado ao servidor para gerar o link.", "err");
+  /* o link vive no servidor: é lá que o celular do cliente vai bater.
+     Sem sincronização não há link — e a barra do topo já diz por quê. */
+  if (!SYNC.ligado || !nuvemViva()) {
+    religarNuvem(function (ok) {
+      if (ok) return criarLinkLoja();
+      toast("O link mora no servidor e este computador ainda não sincronizou. Veja a barra no topo da tela.", "err");
+    });
+    return;
+  }
   var c = cfg();
   var corpo = {
     codigo: codigoLoja(), tenant_id: T(), nome: org().nome,
@@ -8081,6 +8128,7 @@ function painelCrediario() {
     if (View.pg === "supervisao") ir("supervisao");
   }, 60000);
 })();
+
 
 </script>
 </body>
